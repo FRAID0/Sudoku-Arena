@@ -111,6 +111,12 @@ class RoomManager:
         # Attribuer la grille au host
         host.grid = copy.deepcopy(puzzle)
 
+        # Si mode Solo AI, inscrire automatiquement le bot comme adversaire
+        if mode == GameMode.SOLO_AI:
+            bot_player = Player(player_id="bot_ki_fraid", name="KI FRAID 🤖", is_host=False)
+            bot_player.grid = copy.deepcopy(puzzle)
+            room.players[bot_player.player_id] = bot_player
+
         self.rooms[code] = room
         return room
 
