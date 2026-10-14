@@ -57,21 +57,44 @@ Dans un jeu d'esprit et de logique comme le Sudoku, **l'intégrité compétitive
 | **🤖 Mode VS KI FRAID** | Duel contre l'IA sur le Mode Tour par Tour ou Mode Course. | 3 niveaux : *Novice* (délai 5-30s, erreurs), *Tactique* (5-20s), *Grand Maître* (3-10s). |
 | **⏱️ Mode Solo / Time Attack** | Entraînement solitaire avec chronomètre global. | Analyse de la régularité et détection de records personnels. |
 
-### 3.2 La Station Virtuelle IoT (Ruban LED NeoPixel)
+### 3.2 Modèle Mathématique de Score & Chrono (Héritage du projet d'origine)
+
+#### Barème des Points de Base
+| Difficulté | Points de Base (`POINTS`) | Durée max du tour (`TURN_TIMEOUT`) |
+| :--- | :---: | :---: |
+| **Facile (Easy)** | 1.0 pt | 30 secondes |
+| **Moyen (Medium)** | 1.5 pts | 20 secondes |
+| **Difficile (Hard)** | 2.0 pts | 10 secondes |
+
+#### Paliers de Bonus de Rapidité (`BONUS_THRESHOLDS`)
+Si le coup valide est joué rapidement avant le temps imparti, un bonus s'ajoute :
+* **Facile** : `< 10s` ➔ **+1.0 pt** bonus | `< 20s` ➔ **+0.5 pt** bonus
+* **Moyen** : `< 7s` ➔ **+1.0 pt** bonus | `< 15s` ➔ **+0.5 pt** bonus
+* **Difficile** : `< 5s` ➔ **+1.0 pt** bonus | `< 8s` ➔ **+0.5 pt** bonus
+
+#### Pénalités & Passage de Tour (`SWITCH_PLAYER`)
+* En cas d'erreur ou si le chrono du tour expire (timeout) :
+  - Déduction d'un point : `max(0, score - 1)`
+  - La case s'illumine en **rouge**
+  - **Passage immédiat du tour** à l'adversaire (ou à KI FRAID)
+* En cas de coup valide :
+  - La case se fige en **vert** avec le chiffre
+  - Le joueur marque `points_base + bonus_vitesse`
+  - Le joueur conserve la main pour continuer son enchaînement !
+
+### 3.3 La Station Virtuelle IoT (Ruban LED NeoPixel)
 Héritage direct du projet hardware d'origine (Raspberry Pi + WS2812b) :
 * Bandeau LED virtuel immersif intégré en haut de l'écran de jeu.
 * **Animations réactives via MQTT/WebSocket** :
-  - `🟢 Vert pulsé` : Chiffre correct validé (+ points).
-  - `🔴 Rouge clignotant` : Erreur commise (- pénalité temps/score).
-  - `🔵 Bleu balayage` : Tour du joueur actif.
-  - `🌈 Vague Arc-en-ciel (Rainbow Wipe)` : Victoire finale / Fin de grille.
+  - `🟢 Vert pulsé` : Chiffre correct validé (+ points et bonus).
+  - `🔴 Rouge clignotant` : Erreur ou fin de chrono (- pénalité, switch de joueur).
+  - `🔵 Bleu balayage` : Témoin lumineux signalant le joueur actif.
+  - `🌈 Vague Arc-en-ciel (Rainbow Wipe)` : Victoire finale / Grille complétée.
 
-### 3.3 Gestion des Salons & Joueurs
-* **Rôles** : Joueur 1 (Hôte), Joueur 2 (Challenger), Spectateurs (illimités en écoute).
-* **Paramètres de Salon** :
-  - Difficulté : Facile, Moyen, Difficile, Diabolique.
-  - Timer par coup : 15s, 30s, 60s ou Illimité.
-  - Malus par erreur : Déduction de points ou gel de jeu pendant 5s.
+### 3.4 Optimisations Ergonomiques Neo-Arcade
+* **Barre de tension du timer** : Ligne néon lumineuse au-dessus de la grille qui rétrécit pendant le tour et vire au rouge clignotant sous les 3 secondes.
+* **Halo de tour interactif** : Badge du joueur actif pulsant en bleu néon avec indicateur sonore à la prise de main.
+* **Verrouillage préventif** : Clavier désactivé quand ce n'est pas votre tour pour éviter les clics accidentels.
 
 ---
 
