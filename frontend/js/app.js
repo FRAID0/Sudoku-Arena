@@ -1,6 +1,34 @@
 /**
  * Sudoku Arena — Frontend Game Engine & WebSocket Client
+ * Gère le décompte synchrone, le bot KI FRAID, l'audio synthétique et le ruban LED IoT.
  */
+
+// Audio Web synthétique (sans fichier externe)
+let audioCtx = null;
+function getAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtx;
+}
+
+function playBeep(frequency = 440, duration = 0.15) {
+    try {
+        const ctx = getAudioContext();
+        if (ctx.state === "suspended") ctx.resume();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = frequency;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+    } catch (e) {
+        // Fallback silencieux si l'audio est bloqué par le navigateur
+    }
+}
 
 // État de l'application
 const state = {
@@ -8,11 +36,10 @@ const state = {
     playerName: "Joueur 1",
     roomCode: null,
     isHost: false,
-    selectedCell: null, // {row, col}
+    selectedCell: null,
     grid: null,
     socket: null,
-    isAiMatch: false,
-    aiTimer: null
+    isAiMatch: false
 };
 
 // Éléments du DOM
@@ -38,6 +65,8 @@ const dom = {
     p2Score: document.getElementById("p2Score"),
     p1ProgressFill: document.getElementById("p1ProgressFill"),
     p2ProgressFill: document.getElementById("p2ProgressFill"),
+    countdownOverlay: document.getElementById("countdownOverlay"),
+    countdownNumber: document.getElementById("countdownNumber"),
     gameOverModal: document.getElementById("gameOverModal"),
     modalWinnerTitle: document.getElementById("modalWinnerTitle"),
     modalWinnerDesc: document.getElementById("modalWinnerDesc"),
@@ -58,15 +87,15 @@ function initVirtualLedStrip() {
 function triggerLedEffect(effect) {
     const pixels = document.querySelectorAll(".led-pixel");
     pixels.forEach((p, idx) => {
-        p.className = "led-pixel"; // Reset
+        p.className = "led-pixel";
         if (effect === "success") {
-            setTimeout(() => { p.classList.add("green"); }, idx * 10);
-            setTimeout(() => { p.className = "led-pixel"; }, 800);
+            setTimeout(() => { p.classList.add("green"); }, idx * 8);
+            setTimeout(() => { p.className = "led-pixel"; }, 600);
         } else if (effect === "error") {
             p.classList.add("red");
-            setTimeout(() => { p.className = "led-pixel"; }, 500);
+            setTimeout(() => { p.className = "led-pixel"; }, 400);
         } else if (effect === "victory") {
-            setTimeout(() => { p.classList.add("rainbow"); }, idx * 20);
+            setTimeout(() => { p.classList.add("rainbow"); }, idx * 15);
         }
     });
 }
@@ -119,16 +148,16 @@ function handleInput(number) {
 }
 
 // Connexion WebSocket
-function connectWebSocket(roomCode) {
+function connectWebSocket(roomCode, onOpenCallback = null) {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
-    // Si on tourne en local hors Nginx, fallback sur :8000
     const wsUrl = `${protocol}//${host}/ws/${roomCode}/${state.playerId}/${encodeURIComponent(state.playerName)}`;
 
     state.socket = new WebSocket(wsUrl);
 
     state.socket.onopen = () => {
         console.log("WebSocket connecté au salon :", roomCode);
+        if (onOpenCallback) onOpenCallback();
     };
 
     state.socket.onmessage = (event) => {
@@ -137,11 +166,17 @@ function connectWebSocket(roomCode) {
 
         if (msg.event === "PLAYER_JOINED") {
             updatePlayersLobby(msg.players);
+        } else if (msg.event === "COUNTDOWN") {
+            dom.countdownOverlay.classList.remove("hidden");
+            dom.countdownNumber.textContent = msg.count;
+            playBeep(msg.count === 1 ? 660 : 440, 0.18);
         } else if (msg.event === "GAME_STARTED") {
+            dom.countdownOverlay.classList.add("hidden");
             dom.matchStatusText.textContent = "🔥 MATCH EN COURS";
             dom.btnStartGame.classList.add("hidden");
             buildBoardUI(msg.initial_puzzle);
             triggerLedEffect("success");
+            playBeep(980, 0.3); // Son de lancement aigu
         } else if (msg.event === "MOVE_RESULT") {
             const res = msg.result;
             if (res.player_id === state.playerId) {
@@ -154,15 +189,17 @@ function connectWebSocket(roomCode) {
                     dom.p1Score.textContent = `${res.score} pts`;
                     dom.p1ProgressFill.style.width = `${res.progress}%`;
                     triggerLedEffect("success");
+                    playBeep(523.25, 0.12); // Do aigu (succès)
                 } else {
                     if (cellEl) {
                         cellEl.classList.add("error-shake");
                         setTimeout(() => cellEl.classList.remove("error-shake"), 300);
                     }
                     triggerLedEffect("error");
+                    playBeep(220, 0.25); // Faible (erreur)
                 }
             } else {
-                // Coup de l'adversaire
+                // Coup de l'adversaire ou du bot
                 if (res.valid) {
                     dom.p2Score.textContent = `${res.score} pts`;
                     dom.p2ProgressFill.style.width = `${res.progress}%`;
@@ -202,6 +239,7 @@ function showGameOver(isWinner) {
         ? "Félicitations, vous avez triomphé dans l'arène !" 
         : "Votre adversaire a complété sa grille plus vite.";
     dom.gameOverModal.classList.remove("hidden");
+    playBeep(isWinner ? 880 : 180, 0.6);
 }
 
 // Navigation & Actions
@@ -252,7 +290,7 @@ dom.btnJoinRoom.addEventListener("click", () => {
     connectWebSocket(state.roomCode);
 });
 
-// Duel contre KI FRAID
+// Duel solo contre KI FRAID
 dom.btnPlayAi.addEventListener("click", async () => {
     state.playerName = dom.playerNameInput.value.trim() || "Joueur";
     state.isAiMatch = true;
@@ -273,16 +311,24 @@ dom.btnPlayAi.addEventListener("click", async () => {
         state.roomCode = data.room_code;
 
         dom.displayRoomCode.textContent = "VS-AI";
-        dom.p1Name.textContent = state.playerName;
+        dom.p1Name.textContent = state.playerName + " (Moi)";
         dom.p2Name.textContent = "KI FRAID 🤖";
-        dom.matchStatusText.textContent = "🔥 DUEL VS IA";
+        dom.matchStatusText.textContent = "Départ imminent...";
 
         dom.lobbySection.classList.add("hidden");
         dom.gameSection.classList.remove("hidden");
         dom.btnStartGame.classList.add("hidden");
 
         buildBoardUI(data.initial_puzzle);
-        connectWebSocket(state.roomCode);
+
+        // Connexion WebSocket et lancement automatique du décompte
+        connectWebSocket(state.roomCode, () => {
+            setTimeout(() => {
+                if (state.socket) {
+                    state.socket.send(JSON.stringify({ action: "START_GAME" }));
+                }
+            }, 300);
+        });
     } catch (err) {
         alert("Erreur démarrage solo IA : " + err);
     }
@@ -302,6 +348,21 @@ dom.btnBackLobby.addEventListener("click", () => {
     window.location.reload();
 });
 
+dom.btnRematch.addEventListener("click", () => {
+    window.location.reload();
+});
+
+dom.btnErase.addEventListener("click", () => {
+    if (state.selectedCell) {
+        const { row, col } = state.selectedCell;
+        const cellEl = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
+        if (cellEl && !cellEl.classList.contains("fixed")) {
+            cellEl.textContent = "";
+            cellEl.classList.remove("user-filled");
+        }
+    }
+});
+
 // Pavé Tactile & Clavier
 document.querySelectorAll(".numpad-btn").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -314,7 +375,7 @@ window.addEventListener("keydown", (e) => {
     if (e.key >= "1" && e.key <= "9") {
         handleInput(parseInt(e.key, 10));
     } else if (e.key === "Backspace" || e.key === "Delete") {
-        // Optionnel : effacer
+        dom.btnErase.click();
     }
 });
 
