@@ -1,0 +1,181 @@
+"""
+FastAPI Server & WebSocket Gateway for Sudoku Arena
+Expose les endpoints REST et les connexions WebSockets pour les salons de jeu.
+"""
+
+import json
+from typing import Dict, List
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from app.core.room_manager import RoomManager, GameMode, RoomState
+
+app = FastAPI(
+    title="Sudoku Arena API",
+    version="1.0.0",
+    description="Real-Time Multiplayer & AI Sudoku Game Engine"
+)
+
+# Configuration CORS pour autoriser le frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+room_manager = RoomManager()
+
+
+class CreateRoomRequest(BaseModel):
+    host_id: str
+    host_name: str
+    mode: str = "race"
+    difficulty: str = "medium"
+
+
+class ConnectionManager:
+    """Gère les connexions WebSockets actives par salon."""
+    def __init__(self):
+        # room_code -> list of active WebSockets
+        self.active_connections: Dict[str, List[WebSocket]] = {}
+
+    async def connect(self, room_code: str, websocket: WebSocket):
+        await websocket.accept()
+        if room_code not in self.active_connections:
+            self.active_connections[room_code] = []
+        self.active_connections[room_code].append(websocket)
+
+    def disconnect(self, room_code: str, websocket: WebSocket):
+        if room_code in self.active_connections:
+            if websocket in self.active_connections[room_code]:
+                self.active_connections[room_code].remove(websocket)
+            if not self.active_connections[room_code]:
+                del self.active_connections[room_code]
+
+    async def broadcast(self, room_code: str, message: dict):
+        if room_code in self.active_connections:
+            data = json.dumps(message)
+            for connection in self.active_connections[room_code]:
+                try:
+                    await connection.send_text(data)
+                except Exception:
+                    pass
+
+
+ws_manager = ConnectionManager()
+
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "Sudoku Arena Backend",
+        "active_rooms": len(room_manager.rooms)
+    }
+
+
+@app.post("/api/rooms")
+async def create_room(req: CreateRoomRequest):
+    try:
+        mode = GameMode(req.mode)
+    except ValueError:
+        mode = GameMode.RACE
+
+    room = room_manager.create_room(
+        host_id=req.host_id,
+        host_name=req.host_name,
+        mode=mode,
+        difficulty=req.difficulty
+    )
+    return {
+        "room_code": room.room_code,
+        "mode": room.mode.value,
+        "difficulty": room.difficulty,
+        "initial_puzzle": room.initial_puzzle
+    }
+
+
+@app.get("/api/rooms/{room_code}")
+async def get_room(room_code: str):
+    room = room_manager.rooms.get(room_code.upper())
+    if not room:
+        raise HTTPException(status_code=404, detail="Salon introuvable")
+
+    return {
+        "room_code": room.room_code,
+        "state": room.state.value,
+        "mode": room.mode.value,
+        "difficulty": room.difficulty,
+        "players": [
+            {
+                "id": p.player_id,
+                "name": p.name,
+                "is_host": p.is_host,
+                "score": p.score,
+                "mistakes": p.mistakes,
+                "progress": p.progress
+            }
+            for p in room.player_list
+        ],
+        "spectators_count": len(room.spectators)
+    }
+
+
+@app.websocket("/ws/{room_code}/{player_id}/{player_name}")
+async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: str, player_name: str):
+    code = room_code.upper()
+    try:
+        room, role = room_manager.join_room(code, player_id, player_name)
+    except ValueError as e:
+        await websocket.close(code=1008, reason=str(e))
+        return
+
+    await ws_manager.connect(code, websocket)
+
+    # Informer tous les membres du salon de l'arrivée du joueur
+    await ws_manager.broadcast(code, {
+        "event": "PLAYER_JOINED",
+        "player_id": player_id,
+        "player_name": player_name,
+        "role": role,
+        "players": [{"id": p.player_id, "name": p.name, "is_host": p.is_host} for p in room.player_list]
+    })
+
+    try:
+        while True:
+            raw_data = await websocket.receive_text()
+            data = json.loads(raw_data)
+            action = data.get("action")
+
+            if action == "START_GAME":
+                # Seul l'hôte peut lancer
+                player = room.players.get(player_id)
+                if player and player.is_host:
+                    room_manager.start_game(code)
+                    await ws_manager.broadcast(code, {
+                        "event": "GAME_STARTED",
+                        "start_time": room.start_time,
+                        "initial_puzzle": room.initial_puzzle
+                    })
+
+            elif action == "PLAY_MOVE":
+                row = data.get("row")
+                col = data.get("col")
+                val = data.get("value")
+
+                res = room_manager.play_move(code, player_id, row, col, val)
+                await ws_manager.broadcast(code, {
+                    "event": "MOVE_RESULT",
+                    "result": res
+                })
+
+    except WebSocketDisconnect:
+        ws_manager.disconnect(code, websocket)
+        room_manager.leave_room(code, player_id)
+        await ws_manager.broadcast(code, {
+            "event": "PLAYER_LEFT",
+            "player_id": player_id
+        })
