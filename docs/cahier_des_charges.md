@@ -39,17 +39,10 @@ Dans un jeu d'esprit et de logique comme le Sudoku, **l'intégrité compétitive
    │    skins LED personnalisés, stats avancées & heatmaps        │
    └──────────────────────────────┬───────────────────────────────┘
                                   ▼
-   ┌──────────────────────────────────────────────────────────────┐
-   │ PALIER 3 : Événements, Communautés & B2B                     │
-   │  • Tournois inter-écoles / entreprises (Hackathons, soirées) │
-   │  • Ligues saisonnières avec cashprize ou lots sponsorisés    │
-   └──────────────────────────────────────────────────────────────┘
-```
-
-### 2.3 Mécaniques de Viralité intégrées
-* **Lobby Instantané par Code & Lien direct** : Un clic sur "Défier un ami" génère un lien (`sudoku-arena.io/join/ABCD`) partageable sur WhatsApp/Discord.
-* **Revanche Express** : Bouton immédiat "Prendre sa revanche" qui relance une manche en miroir.
-* **Carte de Résultat Partageable** : Image/carte générée automatiquement en fin de partie affichant le chrono, le différentiel de score et la signature visuelle pour Instagram/Twitter/LinkedIn.
+### 2.4 Extension IA Générative (LLM Assistant & Immersion)
+* **Trash-Talk & Ambiance en direct** : KI FRAID ou un bot IA utilise un LLM léger pour envoyer des punchlines et des réactions textuelles en direct dans le chat en fonction des actions du joueur (*« Tu hésites sur le bloc 4 ? Tu transpires déjà ! »*).
+* **Coach IA de Fin de Partie (Post-Match Analysis)** : Analyse de la feuille de match par le LLM pour expliquer au joueur ses erreurs, son temps perdu et lui donner un conseil pédagogique d'amélioration.
+* **Moteur logique découplé** : La résolution mathématique reste 100% assurée par l'algorithme Python pur (Backtracking instantané < 1ms, 0€ de coût API).
 
 ---
 
@@ -59,10 +52,10 @@ Dans un jeu d'esprit et de logique comme le Sudoku, **l'intégrité compétitive
 
 | Mode | Description | Mécanique clé |
 | :--- | :--- | :--- |
-| **🏎️ Mode Course (Speedrun)** | Deux joueurs reçoivent la **même grille miroir** en simultané. | Le premier qui termine sans faute gagne. Visualisation de la barre de progression adverse en direct (effet "Ghost"). |
-| **⚡ Mode Clash (Signature)** | Les joueurs s'affrontent sur une **grille partagée au tour par tour** ou en temps réel avec verrouillage temporaire de case. | Chaque bonne case donne des points. Une erreur déclenche un malus et passe la main. Vol de points stratégique. |
-| **🤖 Mode VS KI FRAID** | Duel solo contre l'intelligence artificielle du système. | 3 niveaux : *Débutant* (aléatoire avec fautes), *Intermédiaire* (solver partiel avec pause humaine), *Expert* (solver backtracking ultra-rapide). |
-| **⏱️ Mode Solo / Time Attack** | Entraînement solitaire avec grille quotidienne et chrono personnel. | Analyse de la régularité, détection de records personnels. |
+| **⚡ Mode Clash (Tour par Tour d'origine)** | Les deux joueurs (ou Joueur vs KI) partagent **la même grille**. | Chrono par tour (10s en Difficile, 20s en Moyen, 30s en Facile). **Bon coup** : chiffre validé en vert + points de base + bonus de rapidité. **Erreur ou Fin de chrono** : chiffre rouge/secoué, pénalité de points et **passage immédiat du tour** à l'adversaire. Témoin lumineux (buzzer/LED) indiquant le joueur actif. |
+| **🏎️ Mode Course (Speedrun Miroir)** | Chaque joueur résout **sa propre copie identique** du puzzle. | Course de vitesse pure. Jauge de progression adverse en direct (Ghost bar). Le premier à compléter sa grille gagne. |
+| **🤖 Mode VS KI FRAID** | Duel contre l'IA sur le Mode Tour par Tour ou Mode Course. | 3 niveaux : *Novice* (délai 5-30s, erreurs), *Tactique* (5-20s), *Grand Maître* (3-10s). |
+| **⏱️ Mode Solo / Time Attack** | Entraînement solitaire avec chronomètre global. | Analyse de la régularité et détection de records personnels. |
 
 ### 3.2 La Station Virtuelle IoT (Ruban LED NeoPixel)
 Héritage direct du projet hardware d'origine (Raspberry Pi + WS2812b) :
