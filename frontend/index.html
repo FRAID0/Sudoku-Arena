@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sudoku Arena — Real-Time Multiplayer & AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="arena-container">
+        <!-- Bandeau LED Virtuel IoT (WS2812b NeoPixel) -->
+        <header class="iot-led-station">
+            <div class="led-bar-label">
+                <span class="pulse-dot"></span>
+                <span>IOT VIRTUAL LED MATRIX — WS2812B</span>
+            </div>
+            <div class="led-strip" id="ledStrip">
+                <!-- 30 pixels LED générés par JS -->
+            </div>
+        </header>
+
+        <!-- Titre & Statut -->
+        <div class="brand-header">
+            <h1 class="glitch-title">SUDOKU <span class="neon-accent">ARENA</span></h1>
+            <p class="subtitle">POWERED BY FRAID — REAL-TIME CLOUD & IOT BATTLE</p>
+        </div>
+
+        <!-- Section Lobby (Création / Connexion salon) -->
+        <main id="lobbySection" class="glass-card lobby-card">
+            <h2>🕹️ REJOINDRE L'ARÈNE</h2>
+            
+            <div class="form-group">
+                <label for="playerName">Votre Pseudo :</label>
+                <input type="text" id="playerName" placeholder="ex: NeoSolver" maxlength="15" value="Joueur 1">
+            </div>
+
+            <div class="actions-grid">
+                <!-- Créer un salon -->
+                <div class="action-box">
+                    <h3>Créer un Salon Privé</h3>
+                    <div class="select-group">
+                        <label for="gameDifficulty">Difficulté :</label>
+                        <select id="gameDifficulty">
+                            <option value="easy">Facile (Novice)</option>
+                            <option value="medium" selected>Moyen (Équilibré)</option>
+                            <option value="hard">Difficile (Expert)</option>
+                        </select>
+                    </div>
+                    <button id="btnCreateRoom" class="btn btn-primary">Créer le Salon 🚀</button>
+                </div>
+
+                <!-- Rejoindre un salon -->
+                <div class="action-box">
+                    <h3>Rejoindre par Code</h3>
+                    <div class="input-inline">
+                        <input type="text" id="joinCodeInput" placeholder="CODE (ex: K9AF)" maxlength="4">
+                        <button id="btnJoinRoom" class="btn btn-secondary">Rejoindre ⚔️</button>
+                    </div>
+                </div>
+
+                <!-- Mode Solo vs KI FRAID -->
+                <div class="action-box ai-box">
+                    <h3>Duel vs KI FRAID (Bot)</h3>
+                    <p>Affrontez l'IA autonome sans attendre d'adversaire humain.</p>
+                    <button id="btnPlayAi" class="btn btn-ai">Défier KI FRAID 🤖</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Section Match (Grille & Duels) -->
+        <main id="gameSection" class="game-layout hidden">
+            <!-- Panneau Haut : Match Info & Barres de Progression -->
+            <div class="match-bar glass-card">
+                <div class="room-badge">
+                    SALON : <span id="displayRoomCode" class="room-code-tag">----</span>
+                </div>
+
+                <!-- Ghost Progress Bars (Effet miroir 1v1) -->
+                <div class="players-progress-container">
+                    <div class="player-progress-bar">
+                        <div class="player-info">
+                            <span id="p1Name" class="player-tag p1-tag">Moi</span>
+                            <span id="p1Score">0 pts</span>
+                        </div>
+                        <div class="track">
+                            <div id="p1ProgressFill" class="fill fill-p1" style="width: 0%"></div>
+                        </div>
+                    </div>
+
+                    <div class="player-progress-bar">
+                        <div class="player-info">
+                            <span id="p2Name" class="player-tag p2-tag">Adversaire</span>
+                            <span id="p2Score">0 pts</span>
+                        </div>
+                        <div class="track">
+                            <div id="p2ProgressFill" class="fill fill-p2" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="match-status-badge" id="matchStatusText">En attente...</div>
+            </div>
+
+            <!-- Grille Sudoku 9x9 et Clavier -->
+            <div class="arena-board-wrapper">
+                <div class="sudoku-board-container glass-card">
+                    <div class="sudoku-grid" id="sudokuGrid">
+                        <!-- 81 cellules générées par JS -->
+                    </div>
+                </div>
+
+                <!-- Pavé Tactile / Contrôles -->
+                <div class="controls-container glass-card">
+                    <div class="numpad-grid">
+                        <button class="numpad-btn" data-val="1">1</button>
+                        <button class="numpad-btn" data-val="2">2</button>
+                        <button class="numpad-btn" data-val="3">3</button>
+                        <button class="numpad-btn" data-val="4">4</button>
+                        <button class="numpad-btn" data-val="5">5</button>
+                        <button class="numpad-btn" data-val="6">6</button>
+                        <button class="numpad-btn" data-val="7">7</button>
+                        <button class="numpad-btn" data-val="8">8</button>
+                        <button class="numpad-btn" data-val="9">9</button>
+                    </div>
+
+                    <div class="board-actions">
+                        <button id="btnErase" class="btn btn-action">Effacer ⌫</button>
+                        <button id="btnStartGame" class="btn btn-primary hidden">Démarrer le Duel 🔥</button>
+                        <button id="btnLeaveRoom" class="btn btn-danger">Quitter 🚪</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modal Fin de Partie -->
+        <div id="gameOverModal" class="modal-overlay hidden">
+            <div class="modal-card glass-card">
+                <h2 id="modalWinnerTitle" class="neon-accent">VICTOIRE ! 🏆</h2>
+                <p id="modalWinnerDesc">Vous avez complété la grille en premier.</p>
+                <div class="modal-stats" id="modalStats">
+                    <!-- Stats injectées -->
+                </div>
+                <div class="modal-actions">
+                    <button id="btnRematch" class="btn btn-primary">Revanche Immédiate 🔄</button>
+                    <button id="btnBackLobby" class="btn btn-secondary">Retour au Lobby</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>
