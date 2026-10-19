@@ -83,24 +83,16 @@
 
                 <!-- Mode Solo vs KI FRAID -->
                 <div class="action-box ai-box">
-                    <h3>Duel vs KI FRAID (Bot)</h3>
-                    <p>Affrontez l'IA en Tour par Tour avec chronomètre et vol de points.</p>
-                    <div class="select-group">
-                        <label for="aiValidationMode">Règle de Validation :</label>
-                        <select id="aiValidationMode">
-                            <option value="simple" selected>✨ Mode Simple (Règles locales)</option>
-                            <option value="strict">🧩 Mode Casse-Tête (Solution unique)</option>
-                        </select>
-                        <span class="helper-text" id="aiValidationHelp">✨ Chiffres valides selon les règles Sudoku sans bloquer sur la solution finale</span>
+                    <div class="ai-card-top">
+                        <div class="ai-avatar-container">
+                            <img src="assets/ki-fraid.jpg" alt="KI FRAID - Cyberpunk Sudoku AI" class="ai-avatar-thumb">
+                        </div>
+                        <div class="ai-meta">
+                            <h3>Duel vs KI FRAID</h3>
+                            <span class="ai-status-pill">⚡ BOT CYBERNÉTIQUE</span>
+                        </div>
                     </div>
-                    <div class="select-group">
-                        <label for="aiDifficulty">Niveau de KI FRAID :</label>
-                        <select id="aiDifficulty">
-                            <option value="easy">Novice (Chrono 30s • Hésitant & ~35% erreurs)</option>
-                            <option value="medium" selected>Tactique (Chrono 20s • Équilibré & ~18% erreurs)</option>
-                            <option value="hard">Grand Maître (Chrono 10s • Vif & ~5% erreurs)</option>
-                        </select>
-                    </div>
+                    <p class="ai-brief">Affrontez l'IA autonome en duel tour par tour. Elle s'adapte automatiquement à la difficulté et aux règles choisies.</p>
                     <button id="btnPlayAi" class="btn btn-ai">Défier KI FRAID 🤖</button>
                 </div>
             </div>
