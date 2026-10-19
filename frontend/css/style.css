@@ -958,3 +958,40 @@ input:focus, select:focus {
     height: min(420px, calc(100dvh - 175px), 58vw);
 }
 
+@media (max-width: 768px) {
+    .arena-container.in-game {
+        padding: 4px 8px;
+        gap: 6px;
+    }
+
+    .arena-container.in-game .virtual-led-container {
+        display: none;
+    }
+
+    .arena-container.in-game .match-bar {
+        padding: 6px 10px;
+        gap: 6px;
+    }
+
+    .arena-container.in-game .sudoku-grid {
+        width: min(340px, calc(100dvh - 210px), 92vw);
+        height: min(340px, calc(100dvh - 210px), 92vw);
+    }
+
+    .arena-container.in-game .controls-container {
+        padding: 4px;
+        gap: 4px;
+        max-width: min(340px, 92vw);
+    }
+
+    .arena-container.in-game .numpad-btn {
+        padding: 8px 0;
+        font-size: 1.1rem;
+    }
+
+    .arena-container.in-game #btnStartGame {
+        padding: 8px;
+        font-size: 0.85rem;
+    }
+}
+
