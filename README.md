@@ -1,40 +1,48 @@
-﻿# 🎯 Sudoku Arena (Cloud-Native IoT Edition)
+# 🎯 Sudoku Arena (Cloud-Native IoT Edition)
 
-> **Real-Time Multiplayer & AI Sudoku Arena** with event-driven architecture, virtual IoT reactive lighting, and Kubernetes-ready microservices.
+> **Real-Time Multiplayer & AI Sudoku Arena** with event-driven architecture, virtual IoT reactive lighting, dual validation logic, and Kubernetes-orchestrated microservices.
 
----
-
-## 🚀 Overview
-
-**Sudoku Arena** is a modern reimagining of a Raspberry Pi IoT Sudoku battle station. It transforms a hardware turn-based Sudoku puzzle game into a full-scale **Cloud-Native multiplayer platform**.
-
-### ✨ Highlights
-- ⚔️ **Multiplayer 1v1 Arena**: Duel friends in real-time on a shared board with turn timers and point stealing.
-- 🤖 **KI FRAID (AI Opponent)**: Intelligent Sudoku bot with 3 difficulty modes and human-like delays.
-- 💡 **Virtual IoT LED Matrix**: Visual feedback simulation (WS2812b NeoPixel style) showing turns, correct numbers, errors, and game-over animations.
-- ⚡ **Event-Driven Architecture**: Ultra-low latency state synchronization powered by MQTT & WebSockets.
-- ☸️ **Kubernetes Ready**: Packaged for scalable multi-pod deployment with Ingress and health probes.
+[![CI Pipeline](https://github.com/FRAID0/Sudoku-Arena/actions/workflows/ci.yml/badge.svg)](https://github.com/FRAID0/Sudoku-Arena/actions)
+[![Live Demo](https://img.shields.io/badge/Demo-Live%20on%20Vercel-success)](https://sudoku-arena-frontend.vercel.app)
+[![Backend](https://img.shields.io/badge/Backend-Northflank%20Cloud-blue)](https://p01--sudoku-backend--hvzj8dcpgjs4.code.run/health)
 
 ---
 
-## 🏗️ Architecture
+## 🌐 Démo Publique en Direct (100% Gratuite)
+
+- **Frontend (Vercel Edge) :** [https://sudoku-arena-frontend.vercel.app](https://sudoku-arena-frontend.vercel.app)
+- **Backend (Northflank Developer Sandbox) :** [https://p01--sudoku-backend--hvzj8dcpgjs4.code.run](https://p01--sudoku-backend--hvzj8dcpgjs4.code.run)
+- **Health Check :** [https://p01--sudoku-backend--hvzj8dcpgjs4.code.run/health](https://p01--sudoku-backend--hvzj8dcpgjs4.code.run/health)
+
+---
+
+## 🚀 Highlights & Gameplay V2
+
+- ⚔️ **Mode Clash (Tour par Tour)** : Duel 1v1 en temps réel sur une grille commune avec chrono individuel, points de rapidité et pénalités.
+- 🏎️ **Mode Course (Speedrun Miroir)** : Chaque joueur résout la même grille en parallèle avec jauges de progression synchronisées en direct.
+- 🤖 **KI FRAID (Bot IA)** : 3 niveaux de jeu autonomes (Novice, Tactique, Grand Maître) avec délais de réflexion réalistes et taux d'erreurs calibré.
+- ✨ **Validation Duale** :
+  - **Mode Simple (Règles locales)** : Tout chiffre conforme aux règles de ligne, colonne et bloc 3x3 immédiat est accepté (zéro frustration).
+  - **Mode Casse-Tête (Solution unique)** : Seule la solution secrète mathématique unique est validée (mode puriste compétition).
+- 💡 **Ruban LED Virtuel IoT (WS2812B NeoPixel)** : Signalétique lumineuse par camp (cyan pour Joueur 1, violet pour Joueur 2 / Bot), impulsions vertes sur coup juste et onde rouge sur faute ou buzzer.
+- 📱 **Ergonomie Zéro-Scroll (100dvh)** : Interface verrouillée sur un seul écran sans défilement vertical, navigation clavier intégrale (flèches + 1-9) et accessibilité tactile mobile.
+
+---
+
+## 🏛️ Stratégie d'Architecture DevOps (2 Niveaux)
 
 ```
-                 [ Web Browser (Player 1) ]        [ Web Browser (Player 2) ]
-                             │                                 │
-                             └────────────► WSS ◄──────────────┘
-                                            │
-                                            ▼
-                               [ Ingress Controller / Proxy ]
-                                            │
-                     ┌──────────────────────┴──────────────────────┐
-                     ▼                                             ▼
-         [ Mosquitto Broker ]                             [ Frontend Nginx ]
-             (MQTT / WSS)                                    (HTML5 / JS)
-                     │
-                     ▼
-         [ Sudoku Game Engine ]
-          (Python Microservice)
+[ Niveau 1 : Démo Publique (Portfolio & Recruteurs) ]
+   Navigateur Web ──────► Vercel (Frontend CDN Edge)
+         │
+         └──────────────► Northflank (FastAPI + WebSockets toujours actif, 0.1 vCPU / 256MB)
+
+[ Niveau 2 : Laboratoire Kubernetes Local (Démonstration DevOps) ]
+   Cluster local Kind / Minikube (6 Pods) :
+   ├── 3x Réplicas Backend (FastAPI, Liveness & Readiness Probes, Auto-restart)
+   ├── 2x Réplicas Frontend (Nginx, Service LoadBalancer)
+   ├── 1x Broker Mosquitto (MQTT / WebSockets)
+   └── CI/CD GitHub Actions (.github/workflows/ci.yml : Pytest, Docker Build, Kubectl Dry-run)
 ```
 
 ---
@@ -43,28 +51,35 @@
 
 ```
 Sudoku-Arena/
-├── backend/            # Python Game Engine (Sudoku logic, AI bot, multi-room state)
-├── frontend/           # Modern Web UI (Cyberpunk theme, responsive board, virtual LED strip)
-├── mosquitto/          # MQTT Broker configuration (WebSockets enabled)
-├── k8s/                # Kubernetes deployment manifests
-└── docker-compose.yml  # Local multi-container development environment
+├── backend/            # Moteur Python FastAPI (SudokuEngine, RoomManager, KI FRAID Bot)
+│   ├── app/            # Code source applicatif et WebSockets
+│   └── tests/          # Suite de tests unitaires automatisés (18 tests pytest)
+├── frontend/           # Interface Web Neo-Arcade (HTML5, Vanilla CSS 100dvh, WebSocket client)
+│   ├── css/            # Thème Cyberpunk, animations LED et toasts d'alerte
+│   └── js/             # Logique temps réel, navigation clavier et reconnexion
+├── k8s/                # Manifests Kubernetes (Deployments, Services, ConfigMap)
+├── mosquitto/          # Configuration broker MQTT (listeners 1883 & 9001 WSS)
+├── docs/               # Cahier des charges et Product Backlog Scrum
+└── docker-compose.yml  # Environnement multi-conteneurs pour développement local
 ```
 
 ---
 
-## 🛠️ Getting Started (Local Development)
+## 🛠️ Lancer en Local
 
-### Prerequisites
-- Docker & Docker Compose
-- Git
-
-### Run with Docker Compose
+### Avec Docker Compose
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
-Open `http://localhost:8080` in your browser.
+Ouvrez `http://localhost:8080` dans votre navigateur.
+
+### Avec la suite de tests automatisés
+```bash
+pytest backend/tests/ -v
+```
 
 ---
 
 ## 📜 License
-MIT License - Created with ❤️ by [FRAID0](https://github.com/FRAID0)
+MIT License - Créé avec ❤️ par [FRAID0](https://github.com/FRAID0)
+
