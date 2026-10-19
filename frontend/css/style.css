@@ -28,23 +28,22 @@ body {
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
     min-height: 100vh;
     min-height: 100dvh;
-    height: 100dvh;
-    overflow: hidden; /* ZÉRO SCROLL : tout tient sur un seul écran */
+    overflow-x: hidden;
+    overflow-y: auto; /* Défilement de sécurité si écran très petit, mais layout ultra compact */
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 8px 12px;
+    padding: 6px 12px;
 }
 
 .arena-container {
     width: 100%;
-    max-width: 980px;
-    height: 100%;
-    max-height: 100dvh;
+    max-width: 960px;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 8px;
+    gap: 6px;
+    margin: auto;
 }
 
 /* En cours de partie, masquer le gros titre pour maximiser l'espace de la grille */
@@ -56,9 +55,9 @@ body {
 .iot-led-station {
     background: rgba(0, 0, 0, 0.6);
     border: 1px solid rgba(0, 240, 255, 0.3);
-    border-radius: 12px;
-    padding: 10px 16px;
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.15);
+    border-radius: 10px;
+    padding: 6px 12px;
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.12);
 }
 
 .led-bar-label {
@@ -147,8 +146,8 @@ body {
 .led-strip {
     display: grid;
     grid-template-columns: repeat(30, 1fr);
-    gap: 4px;
-    height: 12px;
+    gap: 3px;
+    height: 8px;
 }
 
 .led-pixel {
@@ -196,20 +195,22 @@ body {
     background: var(--card-bg);
     backdrop-filter: blur(12px);
     border: 1px solid var(--border-color);
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    padding: 14px 18px;
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
 }
 
 /* Brand Header */
 .brand-header {
     text-align: center;
+    padding: 2px 0;
 }
 
 .glitch-title {
-    font-size: 2.5rem;
+    font-size: 1.65rem;
     font-weight: 900;
     letter-spacing: 2px;
+    line-height: 1.1;
 }
 
 .neon-accent {
@@ -219,38 +220,39 @@ body {
 
 .subtitle {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.85rem;
+    font-size: 0.72rem;
     color: var(--text-secondary);
-    letter-spacing: 2px;
-    margin-top: 4px;
+    letter-spacing: 1.5px;
+    margin-top: 2px;
 }
 
 /* Lobby Section */
 .lobby-card h2 {
-    font-size: 1.4rem;
-    margin-bottom: 20px;
+    font-size: 1.1rem;
+    margin-bottom: 8px;
     text-align: center;
 }
 
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 .form-group label, .select-group label {
     display: block;
-    font-size: 0.9rem;
+    font-size: 0.78rem;
     color: var(--text-secondary);
-    margin-bottom: 6px;
+    margin-bottom: 3px;
+    font-weight: 600;
 }
 
 input, select {
     width: 100%;
-    background: rgba(15, 23, 42, 0.8);
+    background: rgba(15, 23, 42, 0.85);
     border: 1px solid rgba(56, 189, 248, 0.3);
-    border-radius: 8px;
-    padding: 12px 16px;
+    border-radius: 6px;
+    padding: 6px 10px;
     color: var(--text-primary);
-    font-size: 1rem;
+    font-size: 0.85rem;
     font-family: inherit;
     outline: none;
     transition: border-color 0.2s, box-shadow 0.2s;
@@ -258,34 +260,48 @@ input, select {
 
 input:focus, select:focus {
     border-color: var(--neon-blue);
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    box-shadow: 0 0 8px rgba(0, 240, 255, 0.3);
 }
 
 .actions-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+@media (max-width: 768px) {
+    .actions-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .action-box {
-    background: rgba(15, 23, 42, 0.6);
+    background: rgba(15, 23, 42, 0.65);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 16px;
+    border-radius: 10px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
 }
 
 .action-box h3 {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     color: var(--neon-blue);
+    margin: 0;
+}
+
+.action-box p {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    line-height: 1.25;
+    margin: 0;
 }
 
 .input-inline {
     display: flex;
-    gap: 8px;
+    gap: 6px;
 }
 
 .input-inline input {
@@ -298,16 +314,16 @@ input:focus, select:focus {
 /* Buttons */
 .btn {
     border: none;
-    border-radius: 8px;
-    padding: 12px 20px;
-    font-size: 0.95rem;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 0.88rem;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s ease;
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
 }
 
 .btn-primary {
@@ -316,8 +332,8 @@ input:focus, select:focus {
 }
 
 .btn-primary:hover {
-    box-shadow: 0 0 16px rgba(0, 240, 255, 0.5);
-    transform: translateY(-2px);
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.5);
+    transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -336,8 +352,8 @@ input:focus, select:focus {
 }
 
 .btn-ai:hover {
-    box-shadow: 0 0 16px rgba(168, 85, 247, 0.5);
-    transform: translateY(-2px);
+    box-shadow: 0 0 14px rgba(168, 85, 247, 0.5);
+    transform: translateY(-1px);
 }
 
 .btn-danger {
@@ -508,8 +524,10 @@ input:focus, select:focus {
 }
 .arena-board-wrapper {
     display: grid;
-    grid-template-columns: 1fr 280px;
-    gap: 16px;
+    grid-template-columns: auto 240px;
+    justify-content: center;
+    align-items: start;
+    gap: 12px;
 }
 
 @media (max-width: 768px) {
@@ -522,7 +540,7 @@ input:focus, select:focus {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 12px;
+    padding: 6px;
 }
 
 .sudoku-grid {
@@ -530,8 +548,8 @@ input:focus, select:focus {
     grid-template-columns: repeat(9, 1fr);
     grid-template-rows: repeat(9, 1fr);
     gap: 2px;
-    width: 100%;
-    max-width: 480px;
+    width: min(100%, 390px, calc(100dvh - 210px));
+    height: min(100%, 390px, calc(100dvh - 210px));
     aspect-ratio: 1 / 1;
     background: #1e293b;
     border: 3px solid var(--neon-blue);
@@ -544,7 +562,7 @@ input:focus, select:focus {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 1.4rem;
+    font-size: clamp(0.95rem, 2.3vh, 1.35rem);
     font-weight: 700;
     cursor: pointer;
     user-select: none;
@@ -628,21 +646,23 @@ input:focus, select:focus {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 16px;
+    gap: 8px;
+    padding: 10px;
+    max-width: 250px;
 }
 
 .numpad-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    gap: 6px;
 }
 
 .numpad-btn {
     background: rgba(15, 23, 42, 0.9);
     border: 1px solid rgba(56, 189, 248, 0.25);
-    border-radius: 8px;
-    padding: 16px 0;
-    font-size: 1.5rem;
+    border-radius: 6px;
+    padding: 8px 0;
+    font-size: 1.25rem;
     font-weight: 800;
     color: white;
     cursor: pointer;
@@ -656,9 +676,13 @@ input:focus, select:focus {
 }
 
 .board-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+#btnStartGame {
+    grid-column: span 2;
 }
 
 /* Modals */

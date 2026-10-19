@@ -314,6 +314,21 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
                 if res.get("game_over"):
                     publish_mqtt("game/led", {"state": "rainbow", "winner": res.get("winner_id")})
 
+            elif action == "TIMEOUT_TURN":
+                room = room_manager.rooms.get(code)
+                if room and room.mode in (GameMode.CLASH, GameMode.SOLO_AI) and room.current_turn_player_id == player_id:
+                    timeout_res = room_manager.timeout_turn(code)
+                    if timeout_res:
+                        await ws_manager.broadcast(code, {
+                            "event": "TURN_TIMEOUT",
+                            "result": timeout_res
+                        })
+                        publish_mqtt("game/led", {
+                            "state": "red",
+                            "reason": "timeout",
+                            "player": timeout_res.get("timed_out_player_id")
+                        })
+
     except WebSocketDisconnect:
         ws_manager.disconnect(code, websocket)
         room_manager.leave_room(code, player_id)

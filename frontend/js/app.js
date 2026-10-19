@@ -323,6 +323,11 @@ function startTurnTimer(timeoutSeconds) {
 
         if (remaining <= 0) {
             stopTurnTimer();
+            if (dom.turnCountdown) dom.turnCountdown.textContent = "0s";
+            if (dom.turnTimerFill) dom.turnTimerFill.style.width = "0%";
+            if (state.currentTurn === state.playerId && state.socket && state.socket.readyState === WebSocket.OPEN) {
+                state.socket.send(JSON.stringify({ action: "TIMEOUT_TURN" }));
+            }
         }
     }, 80);
 }
