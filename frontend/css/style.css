@@ -330,7 +330,99 @@ input:focus, select:focus {
 .fill-p1 { background: var(--neon-blue); box-shadow: 0 0 8px var(--neon-blue); }
 .fill-p2 { background: var(--neon-purple); box-shadow: 0 0 8px var(--neon-purple); }
 
-/* Arena Board */
+.mode-badge {
+    font-size: 0.75rem;
+    font-weight: 800;
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid var(--neon-purple);
+    color: var(--neon-purple);
+    padding: 3px 8px;
+    border-radius: 12px;
+    margin-left: 8px;
+    letter-spacing: 1px;
+}
+
+/* Barre de Chrono par Tour (Mode Clash) */
+.turn-timer-wrapper {
+    width: 100%;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.turn-timer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+}
+
+.turn-label {
+    font-weight: 700;
+    color: var(--neon-blue);
+    letter-spacing: 1px;
+}
+
+.turn-seconds {
+    font-weight: 800;
+    color: var(--neon-blue);
+}
+
+.turn-timer-track {
+    width: 100%;
+    height: 6px;
+    background: #1e293b;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.turn-timer-fill {
+    height: 100%;
+    background: var(--neon-blue);
+    box-shadow: 0 0 10px var(--neon-blue);
+    transition: width 0.1s linear, background-color 0.3s ease;
+}
+
+.turn-timer-fill.warning {
+    background: #f59e0b;
+    box-shadow: 0 0 10px #f59e0b;
+}
+
+.turn-timer-fill.danger {
+    background: var(--neon-red);
+    box-shadow: 0 0 12px var(--neon-red);
+    animation: dangerPulse 0.5s infinite;
+}
+
+@keyframes dangerPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Halo du Joueur Actif (Tour en cours) */
+.player-progress-bar.active-turn {
+    padding: 6px 10px;
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid var(--neon-blue);
+    border-radius: 8px;
+    box-shadow: 0 0 14px rgba(0, 240, 255, 0.25);
+    transform: scale(1.02);
+    transition: all 0.3s ease;
+}
+
+.player-progress-bar.active-turn.is-p2 {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 14px rgba(168, 85, 247, 0.25);
+}
+
+.cell.error-red {
+    background: rgba(239, 68, 68, 0.45) !important;
+    color: var(--neon-red) !important;
+    animation: shake 0.35s ease-in-out;
+}
 .arena-board-wrapper {
     display: grid;
     grid-template-columns: 1fr 280px;
@@ -381,8 +473,19 @@ input:focus, select:focus {
 }
 
 .cell.selected {
-    background: rgba(0, 240, 255, 0.25);
+    background: rgba(0, 240, 255, 0.28);
     outline: 2px solid var(--neon-blue);
+    box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+}
+
+.cell.related {
+    background: rgba(56, 189, 248, 0.08);
+}
+
+.cell.same-number {
+    background: rgba(0, 240, 255, 0.2);
+    color: var(--neon-blue);
+    box-shadow: inset 0 0 6px rgba(0, 240, 255, 0.3);
 }
 
 .cell.fixed {
@@ -392,6 +495,30 @@ input:focus, select:focus {
 
 .cell.user-filled {
     color: var(--cell-user);
+    animation: cellPop 0.25s ease-out;
+}
+
+.cell.opponent-filled {
+    color: var(--neon-purple);
+    text-shadow: 0 0 10px rgba(168, 85, 247, 0.6);
+    animation: cellPop 0.25s ease-out;
+}
+
+@keyframes cellPop {
+    0% { transform: scale(0.7); }
+    70% { transform: scale(1.15); }
+    100% { transform: scale(1); }
+}
+
+.controls-container.disabled-turn {
+    opacity: 0.55;
+    pointer-events: none;
+    filter: grayscale(0.5);
+    transition: opacity 0.25s ease, filter 0.25s ease;
+}
+
+.sudoku-grid.disabled-turn .cell:not(.fixed):not(.user-filled):not(.opponent-filled) {
+    cursor: not-allowed;
 }
 
 .cell.error-shake {

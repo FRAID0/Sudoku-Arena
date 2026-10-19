@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sudoku-backend-deployment
+  labels:
+    app: sudoku-backend
+spec:
+  # 3 copies du backend qui tournent en simultané (Haute Disponibilité)
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sudoku-backend
+  template:
+    metadata:
+      labels:
+        app: sudoku-backend
+    spec:
+      containers:
+        - name: backend
+          image: sudoku-arena-backend:latest
+          # Utilise l'image locale si elle existe (évite de chercher sur Docker Hub)
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          # Injection automatique des variables d'environnement depuis notre ConfigMap
+          envFrom:
+            - configMapRef:
+                name: sudoku-config
+          # Réservation et limitation de ressources (bonnes pratiques DevOps)
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          # Sonde de préparation : K8s vérifie si le pod est prêt à recevoir des joueurs
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          # Sonde de vie : Si le serveur FastAPI freeze ou plante, K8s le tue et le relance
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10

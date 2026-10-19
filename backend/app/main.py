@@ -107,20 +107,28 @@ async def run_ai_opponent(room_code: str, difficulty: str):
         if not room or room.state != RoomState.IN_GAME:
             break
 
+        # Attendre que ce soit le tour du bot
+        if room.current_turn_player_id != ai_id:
+            await asyncio.sleep(0.5)
+            continue
+
         bot_player = room.players.get(ai_id)
         if not bot_player or bot_player.finished:
             break
 
-        move = bot.choose_move(bot_player.grid, room.solution)
+        target_grid = room.shared_grid if room.mode in (GameMode.CLASH, GameMode.SOLO_AI) else bot_player.grid
+        move = bot.choose_move(target_grid, room.solution)
         if not move:
             break
 
-        await asyncio.sleep(move["delay"])
+        # Simuler le délai de réflexion dans la limite du tour
+        simulated_delay = min(move["delay"], max(1.0, room.turn_timeout - 1.5))
+        await asyncio.sleep(simulated_delay)
 
-        # Vérifier si la partie est toujours en cours après le délai de réflexion
+        # Vérifier si c'est toujours le tour du bot
         room = room_manager.rooms.get(room_code)
-        if not room or room.state != RoomState.IN_GAME:
-            break
+        if not room or room.state != RoomState.IN_GAME or room.current_turn_player_id != ai_id:
+            continue
 
         res = room_manager.play_move(room_code, ai_id, move["row"], move["col"], move["value"])
         await ws_manager.broadcast(room_code, {
@@ -134,8 +142,34 @@ async def run_ai_opponent(room_code: str, difficulty: str):
             publish_mqtt("game/led", {"state": "red", "source": "bot"})
 
         if res.get("game_over"):
-            publish_mqtt("game/led", {"state": "rainbow", "winner": ai_id})
+            publish_mqtt("game/led", {"state": "rainbow", "winner": res.get("winner_id")})
             break
+
+
+async def monitor_turn_timer(room_code: str):
+    """Surveille le compte à rebours autoritaire de chaque tour en mode Clash."""
+    while True:
+        await asyncio.sleep(0.4)
+        room = room_manager.rooms.get(room_code)
+        if not room or room.state != RoomState.IN_GAME:
+            break
+        if room.mode not in (GameMode.CLASH, GameMode.SOLO_AI):
+            break
+
+        if room.turn_start_time:
+            elapsed = time.time() - room.turn_start_time
+            if elapsed >= room.turn_timeout:
+                timeout_res = room_manager.timeout_turn(room_code)
+                if timeout_res:
+                    await ws_manager.broadcast(room_code, {
+                        "event": "TURN_TIMEOUT",
+                        "result": timeout_res
+                    })
+                    publish_mqtt("game/led", {
+                        "state": "red",
+                        "reason": "timeout",
+                        "player": timeout_res.get("timed_out_player_id")
+                    })
 
 
 async def start_game_flow(room_code: str):
@@ -151,9 +185,15 @@ async def start_game_flow(room_code: str):
     await ws_manager.broadcast(room_code, {
         "event": "GAME_STARTED",
         "start_time": room.start_time,
-        "initial_puzzle": room.initial_puzzle
+        "turn_timeout": room.turn_timeout,
+        "current_turn": room.current_turn_player_id,
+        "initial_puzzle": room.initial_puzzle,
+        "shared_grid": room.shared_grid
     })
     publish_mqtt("game/led", {"state": "blue"})
+
+    if room.mode in (GameMode.CLASH, GameMode.SOLO_AI):
+        asyncio.create_task(monitor_turn_timer(room_code))
 
     if room.mode == GameMode.SOLO_AI:
         asyncio.create_task(run_ai_opponent(room_code, room.difficulty))
@@ -187,6 +227,12 @@ async def create_room(req: CreateRoomRequest):
         "difficulty": room.difficulty,
         "initial_puzzle": room.initial_puzzle
     }
+
+
+@app.get("/health")
+async def health_check():
+    """Sonde de santé pour Kubernetes (Liveness & Readiness probes)."""
+    return {"status": "healthy", "service": "sudoku-backend"}
 
 
 @app.get("/api/rooms/{room_code}")

@@ -1,0 +1,82 @@
+name: CI Pipeline — Sudoku Arena
+
+# Déclenchement automatique à chaque push ou Pull Request sur main
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # -------------------------------------------------------------
+  # JOB 1 : Exécution des Tests Automatisés (Pytest)
+  # -------------------------------------------------------------
+  test-backend:
+    name: 🧪 Run Pytest Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Récupérer le code source (Checkout)
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurer l'environnement Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: 📦 Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest httpx
+
+      - name: 🚀 Lancer les tests unitaires
+        run: |
+          cd backend
+          pytest -v
+
+  # -------------------------------------------------------------
+  # JOB 2 : Construction et Validation des Images Docker
+  # -------------------------------------------------------------
+  build-docker:
+    name: 🐳 Build Docker Images
+    needs: test-backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Récupérer le code source
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Configurer Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔨 Tester le Build Docker du Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false # On valide le build sans pousser pour le moment
+
+      - name: 🔨 Tester le Build Docker du Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+
+  # -------------------------------------------------------------
+  # JOB 3 : Validation de la Syntaxe des Manifestes Kubernetes
+  # -------------------------------------------------------------
+  validate-k8s:
+    name: ☸️ Validate Kubernetes Manifests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Récupérer le code source
+        uses: actions/checkout@v4
+
+      - name: 🔍 Vérifier la syntaxe des manifests YAML avec kubectl
+        run: |
+          # Valide tous les fichiers .yaml du dossier k8s sans avoir besoin d'un vrai cluster
+          kubectl apply --dry-run=client -f k8s/
