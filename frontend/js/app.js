@@ -73,9 +73,6 @@ const dom = {
     validationMode: document.getElementById("validationMode"),
     validationHelp: document.getElementById("validationHelp"),
     difficultySelect: document.getElementById("gameDifficulty"),
-    aiValidationMode: document.getElementById("aiValidationMode"),
-    aiValidationHelp: document.getElementById("aiValidationHelp"),
-    aiDifficultySelect: document.getElementById("aiDifficulty"),
     btnCreateRoom: document.getElementById("btnCreateRoom"),
     btnJoinRoom: document.getElementById("btnJoinRoom"),
     btnPlayAi: document.getElementById("btnPlayAi"),
@@ -583,9 +580,6 @@ const updateValidationHelp = (selectEl, helpEl) => {
 if (dom.validationMode && dom.validationHelp) {
     dom.validationMode.addEventListener("change", () => updateValidationHelp(dom.validationMode, dom.validationHelp));
 }
-if (dom.aiValidationMode && dom.aiValidationHelp) {
-    dom.aiValidationMode.addEventListener("change", () => updateValidationHelp(dom.aiValidationMode, dom.aiValidationHelp));
-}
 
 // Actions du Lobby
 dom.btnCreateRoom.addEventListener("click", async () => {
@@ -653,8 +647,9 @@ dom.btnPlayAi.addEventListener("click", async () => {
     state.isAiMatch = true;
     state.isHost = true;
     state.mode = "solo_ai";
-    const chosenDiff = dom.aiDifficultySelect ? dom.aiDifficultySelect.value : "medium";
-    const validationMode = dom.aiValidationMode ? dom.aiValidationMode.value : "simple";
+    // Utilise automatiquement la difficulté et règle choisies préalablement
+    const chosenDiff = dom.difficultySelect ? dom.difficultySelect.value : "medium";
+    const validationMode = dom.validationMode ? dom.validationMode.value : "simple";
     state.difficulty = chosenDiff;
     state.validationMode = validationMode;
 
