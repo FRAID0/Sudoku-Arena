@@ -128,6 +128,40 @@ class TestRoomManagerClash(unittest.TestCase):
         self.assertFalse(res_st["valid"])
         self.assertIn("reason", res_st)
 
+    def test_leave_room_waiting(self):
+        room = self.manager.create_room("p1", "Alice", GameMode.CLASH)
+        code = room.room_code
+        self.manager.join_room(code, "p2", "Bob")
+
+        # Bob quitte en salle d'attente
+        res = self.manager.leave_room(code, "p2")
+        self.assertIsNotNone(res)
+        self.assertTrue(res.get("player_left"))
+        self.assertEqual(len(res["remaining_players"]), 1)
+        self.assertNotIn("p2", room.players)
+
+        # Alice (l'hôte) quitte -> Le salon est supprimé
+        res_host = self.manager.leave_room(code, "p1")
+        self.assertTrue(res_host.get("room_deleted"))
+        self.assertNotIn(code, self.manager.rooms)
+
+    def test_leave_room_in_game_forfeit(self):
+        room = self.manager.create_room("p1", "Alice", GameMode.CLASH)
+        code = room.room_code
+        self.manager.join_room(code, "p2", "Bob")
+        self.manager.start_game(code)
+        self.assertEqual(room.state, RoomState.IN_GAME)
+
+        # Bob se déconnecte pendant la partie -> Alice gagne par forfait !
+        res = self.manager.leave_room(code, "p2")
+        self.assertIsNotNone(res)
+        self.assertTrue(res.get("forfeit"))
+        self.assertEqual(res["winner_id"], "p1")
+        self.assertEqual(res["left_player_id"], "p2")
+        self.assertEqual(room.state, RoomState.FINISHED)
+        self.assertEqual(room.winner_id, "p1")
+
 
 if __name__ == "__main__":
     unittest.main()
+
