@@ -324,14 +324,37 @@ class RoomManager:
             "current_turn": next_player
         }
 
-    def leave_room(self, room_code: str, player_id: str):
+    def leave_room(self, room_code: str, player_id: str) -> Optional[Dict]:
         room = self.rooms.get(room_code)
         if not room:
-            return
+            return None
 
-        if player_id in room.players:
-            room.players[player_id].is_connected = False
-            if room.state == RoomState.WAITING and room.players[player_id].is_host:
-                del self.rooms[room_code]
+        leaving_player = room.players.get(player_id)
+        if leaving_player:
+            leaving_player.is_connected = False
+
+            if room.state == RoomState.WAITING:
+                if leaving_player.is_host:
+                    del self.rooms[room_code]
+                    return {"room_deleted": True}
+                else:
+                    del room.players[player_id]
+                    return {"player_left": True, "remaining_players": room.player_list}
+
+            elif room.state == RoomState.IN_GAME:
+                # Rupture de connexion en plein match -> Victoire par forfait pour l'autre joueur !
+                active_players = [p for p in room.player_list if p.is_connected and p.player_id != player_id]
+                if len(active_players) >= 1:
+                    room.state = RoomState.FINISHED
+                    room.winner_id = active_players[0].player_id
+                    room.end_time = time.time()
+                    return {
+                        "forfeit": True,
+                        "winner_id": room.winner_id,
+                        "left_player_id": player_id,
+                        "left_player_name": leaving_player.name
+                    }
         elif player_id in room.spectators:
             room.spectators.remove(player_id)
+
+        return None

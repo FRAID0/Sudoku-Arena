@@ -331,8 +331,23 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
 
     except WebSocketDisconnect:
         ws_manager.disconnect(code, websocket)
-        room_manager.leave_room(code, player_id)
-        await ws_manager.broadcast(code, {
-            "event": "PLAYER_LEFT",
-            "player_id": player_id
-        })
+        res = room_manager.leave_room(code, player_id)
+        if res and res.get("forfeit"):
+            await ws_manager.broadcast(code, {
+                "event": "GAME_OVER_FORFEIT",
+                "winner_id": res.get("winner_id"),
+                "left_player_id": res.get("left_player_id"),
+                "left_player_name": res.get("left_player_name")
+            })
+            publish_mqtt("game/led", {"state": "rainbow", "winner": res.get("winner_id")})
+        elif res and res.get("player_left"):
+            await ws_manager.broadcast(code, {
+                "event": "PLAYER_LEFT",
+                "player_id": player_id,
+                "players": [{"id": p.player_id, "name": p.name, "is_host": p.is_host} for p in res.get("remaining_players", [])]
+            })
+        else:
+            await ws_manager.broadcast(code, {
+                "event": "PLAYER_LEFT",
+                "player_id": player_id
+            })

@@ -509,6 +509,26 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
 
             state.currentTurn = res.current_turn;
             updateTurnUI(res.current_turn, state.turnTimeout);
+        } else if (msg.event === "GAME_OVER_FORFEIT") {
+            stopTurnTimer();
+            triggerLedEffect("victory");
+            const isMe = (msg.winner_id === state.playerId);
+            dom.modalWinnerTitle.textContent = isMe ? "VICTOIRE PAR FORFAIT ! 🏆" : "PARTIE TERMINÉE 💥";
+            dom.modalWinnerDesc.textContent = isMe
+                ? `${msg.left_player_name || "L'adversaire"} a quitté l'arène. Vous remportez le duel par forfait !`
+                : "Vous avez quitté la partie.";
+            dom.gameOverModal.classList.remove("hidden");
+            playBeep(isMe ? 880 : 180, 0.6);
+            showToast(`⚠️ ${msg.left_player_name || "L'adversaire"} a quitté. Victoire par forfait !`, "info", 5000);
+        } else if (msg.event === "PLAYER_LEFT") {
+            if (msg.players) {
+                updatePlayersLobby(msg.players);
+            } else {
+                dom.p2Name.textContent = "En attente...";
+                dom.matchStatusText.textContent = "Partagez le code du salon !";
+                if (dom.btnStartGame) dom.btnStartGame.classList.add("hidden");
+            }
+            showToast("Un joueur a quitté le salon.", "info");
         }
     };
 
