@@ -299,70 +299,116 @@ input:focus, select:focus {
     margin: 0;
 }
 
-.ai-card-top {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.ai-avatar-container {
-    width: 60px;
-    height: 60px;
-    border-radius: 10px;
+/* Hero Card pour KI FRAID */
+.action-box.ai-box {
+    border-color: rgba(168, 85, 247, 0.35);
+    background: linear-gradient(180deg, rgba(30, 27, 75, 0.45) 0%, rgba(15, 23, 42, 0.75) 100%);
+    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.12);
+    position: relative;
     overflow: hidden;
-    border: 2px solid var(--neon-purple);
-    box-shadow: 0 0 14px rgba(168, 85, 247, 0.4);
-    flex-shrink: 0;
+    padding: 10px;
 }
 
-.ai-avatar-thumb {
+.action-box.ai-box:hover {
+    border-color: var(--neon-purple);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.ai-hero-card {
+    position: relative;
+    width: 100%;
+    height: 190px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    box-shadow: 0 0 14px rgba(168, 85, 247, 0.25);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.ai-hero-img {
+    position: absolute;
+    top: 0;
+    left: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
-    display: block;
-    transition: transform 0.3s ease;
+    object-position: center 20%;
+    transition: transform 0.4s ease;
+    z-index: 1;
 }
 
-.action-box.ai-box:hover .ai-avatar-thumb {
-    transform: scale(1.08);
+.action-box.ai-box:hover .ai-hero-img {
+    transform: scale(1.06);
 }
 
-.ai-meta {
+.ai-hero-overlay {
+    position: relative;
+    z-index: 2;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(10, 15, 30, 0.75) 35%, rgba(10, 15, 30, 0.95) 100%);
+    padding: 10px 10px 8px 10px;
     display: flex;
     flex-direction: column;
     gap: 4px;
 }
 
-.ai-status-pill {
+.ai-hero-overlay .ai-status-pill {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.65rem;
+    font-size: 0.62rem;
     font-weight: 700;
-    color: var(--neon-purple);
-    background: rgba(168, 85, 247, 0.15);
-    padding: 2px 6px;
-    border-radius: 8px;
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    color: #e9d5ff;
+    background: rgba(168, 85, 247, 0.35);
+    padding: 2px 7px;
+    border-radius: 6px;
+    border: 1px solid rgba(168, 85, 247, 0.5);
     width: fit-content;
     letter-spacing: 0.8px;
+    text-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
 }
 
-.ai-brief {
+.ai-hero-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #ffffff;
+    margin: 0;
+    text-shadow: 0 0 12px rgba(168, 85, 247, 0.7);
+    letter-spacing: 0.5px;
+}
+
+.ai-hero-desc {
+    font-size: 0.70rem;
+    color: #cbd5e1;
+    line-height: 1.25;
+    margin: 0;
+}
+
+.action-desc {
     font-size: 0.74rem;
     color: #94a3b8;
     line-height: 1.35;
-    margin: 2px 0;
+    margin-top: 4px;
 }
 
 .input-inline {
     display: flex;
     gap: 6px;
+    align-items: center;
 }
 
 .input-inline input {
+    flex: 1;
+    min-width: 0;
     text-transform: uppercase;
     font-family: 'JetBrains Mono', monospace;
     font-weight: 700;
     text-align: center;
+    letter-spacing: 2px;
+}
+
+.input-inline .btn {
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 /* Buttons */
@@ -889,3 +935,26 @@ input:focus, select:focus {
     from { opacity: 0; transform: translate(-50%, -15px); }
     to { opacity: 1; transform: translate(-50%, 0); }
 }
+
+/* In-Game Zero-Scroll Optimization */
+.arena-container.in-game {
+    max-height: 100dvh;
+    overflow: hidden;
+    padding: 6px 14px;
+    gap: 8px;
+}
+
+.arena-container.in-game .brand-header {
+    display: none;
+}
+
+.arena-container.in-game .match-bar {
+    padding: 8px 14px;
+    gap: 8px;
+}
+
+.arena-container.in-game .sudoku-grid {
+    width: min(420px, calc(100dvh - 175px), 58vw);
+    height: min(420px, calc(100dvh - 175px), 58vw);
+}
+
