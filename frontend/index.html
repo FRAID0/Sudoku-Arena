@@ -42,11 +42,18 @@
                 <div class="action-box">
                     <h3>Créer un Salon Privé</h3>
                     <div class="select-group">
+                        <label for="gameMode">Mode de Jeu :</label>
+                        <select id="gameMode">
+                            <option value="clash" selected>⚡ Clash (Tour par Tour — Ta Signature)</option>
+                            <option value="race">🏎️ Course (Speedrun Miroir)</option>
+                        </select>
+                    </div>
+                    <div class="select-group">
                         <label for="gameDifficulty">Difficulté :</label>
                         <select id="gameDifficulty">
-                            <option value="easy">Facile (Novice)</option>
-                            <option value="medium" selected>Moyen (Équilibré)</option>
-                            <option value="hard">Difficile (Expert)</option>
+                            <option value="easy">Facile (Chrono 30s)</option>
+                            <option value="medium" selected>Moyen (Chrono 20s)</option>
+                            <option value="hard">Difficile (Chrono 10s)</option>
                         </select>
                     </div>
                     <button id="btnCreateRoom" class="btn btn-primary">Créer le Salon 🚀</button>
@@ -64,7 +71,15 @@
                 <!-- Mode Solo vs KI FRAID -->
                 <div class="action-box ai-box">
                     <h3>Duel vs KI FRAID (Bot)</h3>
-                    <p>Affrontez l'IA autonome sans attendre d'adversaire humain.</p>
+                    <p>Affrontez l'IA en Tour par Tour avec chronomètre et vol de points.</p>
+                    <div class="select-group">
+                        <label for="aiDifficulty">Niveau de KI FRAID :</label>
+                        <select id="aiDifficulty">
+                            <option value="easy">Novice (Chrono 30s • Hésitant & ~35% erreurs)</option>
+                            <option value="medium" selected>Tactique (Chrono 20s • Équilibré & ~18% erreurs)</option>
+                            <option value="hard">Grand Maître (Chrono 10s • Vif & ~5% erreurs)</option>
+                        </select>
+                    </div>
                     <button id="btnPlayAi" class="btn btn-ai">Défier KI FRAID 🤖</button>
                 </div>
             </div>
@@ -76,11 +91,12 @@
             <div class="match-bar glass-card">
                 <div class="room-badge">
                     SALON : <span id="displayRoomCode" class="room-code-tag">----</span>
+                    <span id="displayModeBadge" class="mode-badge">⚡ CLASH</span>
                 </div>
 
-                <!-- Ghost Progress Bars (Effet miroir 1v1) -->
+                <!-- Ghost Progress Bars -->
                 <div class="players-progress-container">
-                    <div class="player-progress-bar">
+                    <div class="player-progress-bar" id="p1Card">
                         <div class="player-info">
                             <span id="p1Name" class="player-tag p1-tag">Moi</span>
                             <span id="p1Score">0 pts</span>
@@ -90,7 +106,7 @@
                         </div>
                     </div>
 
-                    <div class="player-progress-bar">
+                    <div class="player-progress-bar" id="p2Card">
                         <div class="player-info">
                             <span id="p2Name" class="player-tag p2-tag">Adversaire</span>
                             <span id="p2Score">0 pts</span>
@@ -102,6 +118,17 @@
                 </div>
 
                 <div class="match-status-badge" id="matchStatusText">En attente...</div>
+
+                <!-- Barre de Chrono par Tour (Mode Clash) -->
+                <div class="turn-timer-wrapper" id="turnTimerWrapper">
+                    <div class="turn-timer-header">
+                        <span id="turnLabel" class="turn-label">⏳ À VOTRE TOUR !</span>
+                        <span id="turnCountdown" class="turn-seconds">20s</span>
+                    </div>
+                    <div class="turn-timer-track">
+                        <div id="turnTimerFill" class="turn-timer-fill" style="width: 100%"></div>
+                    </div>
+                </div>
             </div>
 
             <!-- Grille Sudoku 9x9 et Clavier -->

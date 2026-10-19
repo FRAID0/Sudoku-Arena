@@ -43,6 +43,20 @@ class TestFastAPIEndpoints(unittest.TestCase):
         self.assertEqual(len(data_get["players"]), 1)
         self.assertEqual(data_get["players"][0]["name"], "Antigravity")
 
+    def test_create_clash_room(self):
+        payload = {
+            "host_id": "host_clash",
+            "host_name": "Champion",
+            "mode": "clash",
+            "difficulty": "medium"
+        }
+        res = self.client.post("/api/rooms", json=payload)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["mode"], "clash")
+        self.assertEqual(data["difficulty"], "medium")
+        self.assertIn("room_code", data)
+
 
 if __name__ == "__main__":
     unittest.main()

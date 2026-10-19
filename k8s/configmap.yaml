@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sudoku-config
+  labels:
+    app: sudoku-arena
+data:
+  MQTT_BROKER: "mosquitto-service"
+  MQTT_PORT: "1883"
+  ENVIRONMENT: "production"

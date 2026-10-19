@@ -15,18 +15,18 @@ from app.core.sudoku import SudokuEngine, Grid
 class KIFraidBot:
     LEVELS = {
         "easy": {
-            "delay_range": (2.0, 4.0),
-            "error_rate": 0.15,
+            "delay_range": (6.0, 14.0),     # Plus long, hésitant (chrono 30s)
+            "error_range": (0.28, 0.40),    # Plus d'erreurs (~35%)
             "name": "KI FRAID (Novice)"
         },
         "medium": {
-            "delay_range": (1.5, 3.0),
-            "error_rate": 0.05,
+            "delay_range": (4.5, 9.5),      # Ni trop rapide, ni trop long (chrono 20s)
+            "error_range": (0.15, 0.22),    # Moins d'erreurs (~18%)
             "name": "KI FRAID (Tactique)"
         },
         "hard": {
-            "delay_range": (0.8, 1.8),
-            "error_rate": 0.0,
+            "delay_range": (3.0, 6.0),      # Réactif mais réfléchit visiblement (chrono 10s)
+            "error_range": (0.0, 0.0),      # Grand Maître
             "name": "KI FRAID (Grand Maître)"
         }
     }
@@ -36,14 +36,20 @@ class KIFraidBot:
         self.config = self.LEVELS[self.difficulty]
 
     def get_thinking_delay(self) -> float:
-        """Calcule un délai de réflexion pseudo-humain."""
+        """Calcule un délai de réflexion pseudo-humain dynamique dans le range prévu."""
         min_d, max_d = self.config["delay_range"]
-        return round(random.uniform(min_d, max_d), 2)
+        base_delay = random.uniform(min_d, max_d)
+        jitter = random.uniform(-0.35, 0.35)
+        return max(2.0, round(base_delay + jitter, 2))
+
+    def get_error_rate(self) -> float:
+        """Calcule dynamiquement le taux d'erreur dans le range prévu."""
+        min_e, max_e = self.config["error_range"]
+        return random.uniform(min_e, max_e)
 
     def choose_move(self, current_grid: Grid, solution: Grid) -> Optional[Dict]:
         """
-        Choisit le prochain coup de l'IA.
-        Renvoie un dictionnaire avec {row, col, value, delay, is_intentional_error}.
+        Choisit le prochain coup de l'IA avec tirage aléatoire varié et marge d'erreur stochastique.
         """
         # Trouver toutes les cases encore vides
         empty_cells = []
@@ -55,12 +61,13 @@ class KIFraidBot:
         if not empty_cells:
             return None  # Plus de case à jouer
 
-        # Sélection d'une case vide
+        # Mélange aléatoire complet pour éviter les patterns fixes
+        random.shuffle(empty_cells)
         row, col = random.choice(empty_cells)
         correct_value = solution[row][col]
 
-        # Décider si l'IA simule une erreur selon son taux
-        make_mistake = random.random() < self.config["error_rate"]
+        # Décider si l'IA simule une erreur selon son range dynamique
+        make_mistake = random.random() < self.get_error_rate()
 
         if make_mistake:
             wrong_numbers = [n for n in range(1, 10) if n != correct_value]

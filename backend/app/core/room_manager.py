@@ -1,6 +1,7 @@
 """
 Room & Matchmaking Manager for Sudoku Arena
 Gère les salons de jeu, les codes d'invitation, les états et les modes de jeu (Race, Clash, AI).
+Implémente le barème de points d'origine : POINTS, BONUS_THRESHOLDS, pénalités et alternance de tour.
 """
 
 import copy
@@ -15,7 +16,7 @@ from app.core.sudoku import SudokuEngine, Grid
 
 class GameMode(str, Enum):
     RACE = "race"         # Course miroir (chacun sa grille)
-    CLASH = "clash"       # Grille partagée avec capture de cases
+    CLASH = "clash"       # Grille partagée avec tour par tour (Mode Signature)
     SOLO_AI = "solo_ai"   # Solo contre KI FRAID
 
 
@@ -26,6 +27,26 @@ class RoomState(str, Enum):
     FINISHED = "finished"     # Partie terminée
 
 
+# Barème exact issu du projet d'école d'origine
+POINTS = {
+    'easy': 1.0,
+    'medium': 1.5,
+    'hard': 2.0
+}
+
+BONUS_THRESHOLDS = {
+    'easy': [(10.0, 1.0), (20.0, 0.5)],
+    'medium': [(7.0, 1.0), (15.0, 0.5)],
+    'hard': [(5.0, 1.0), (8.0, 0.5)]
+}
+
+TURN_TIMEOUTS = {
+    'easy': 30.0,
+    'medium': 20.0,
+    'hard': 10.0
+}
+
+
 class Player:
     def __init__(self, player_id: str, name: str, is_host: bool = False):
         self.player_id = player_id
@@ -33,7 +54,7 @@ class Player:
         self.is_host = is_host
         self.is_connected = True
         self.grid: Optional[Grid] = None      # Grille personnelle (mode Race)
-        self.score = 0
+        self.score = 0.0
         self.mistakes = 0
         self.progress = 0.0                   # 0.0 à 100.0%
         self.finished = False
@@ -41,10 +62,10 @@ class Player:
 
 
 class Room:
-    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.RACE, difficulty: str = "medium"):
+    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium"):
         self.room_code = room_code
         self.mode = mode
-        self.difficulty = difficulty
+        self.difficulty = difficulty.lower() if difficulty.lower() in POINTS else "medium"
         self.state = RoomState.WAITING
         self.created_at = time.time()
         self.start_time: Optional[float] = None
@@ -54,10 +75,14 @@ class Room:
         self.spectators: List[str] = []
         self.winner_id: Optional[str] = None
 
-        # Puzzles générés
+        # Gestion du tour par tour (Mode Clash & Solo AI)
+        self.current_turn_player_id: Optional[str] = host.player_id
+        self.turn_start_time: Optional[float] = None
+        self.turn_timeout: float = TURN_TIMEOUTS.get(self.difficulty, 20.0)
+
+        # Grilles
         self.initial_puzzle: Optional[Grid] = None
         self.solution: Optional[Grid] = None
-        # Grille partagée pour le mode Clash
         self.shared_grid: Optional[Grid] = None
 
     @property
@@ -81,9 +106,29 @@ class Room:
         filled = empty_initial - empty_now
         return round((filled / empty_initial) * 100.0, 1)
 
+    def switch_turn(self) -> str:
+        """Passe la main au joueur suivant et réinitialise le chrono de tour."""
+        players = self.player_list
+        if len(players) >= 2:
+            current_idx = next((i for i, p in enumerate(players) if p.player_id == self.current_turn_player_id), 0)
+            next_idx = (current_idx + 1) % len(players)
+            self.current_turn_player_id = players[next_idx].player_id
+        self.turn_start_time = time.time()
+        return self.current_turn_player_id
+
+    def calculate_points_and_bonus(self, time_taken: float) -> Tuple[float, float]:
+        """Calcule points de base et bonus selon la formule d'origine."""
+        base = POINTS.get(self.difficulty, 1.0)
+        bonus = 0.0
+        thresholds = BONUS_THRESHOLDS.get(self.difficulty, [])
+        for threshold, bonus_pts in thresholds:
+            if time_taken < threshold:
+                bonus = bonus_pts
+                break
+        return base, bonus
+
 
 class RoomManager:
-    # Alphabet lisible excluant les caractères ambigus (0, O, 1, I)
     CODE_CHARACTERS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
     CODE_LENGTH = 4
 
@@ -97,21 +142,19 @@ class RoomManager:
                 return code
         raise RuntimeError("Impossible de générer un code de salon unique")
 
-    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.RACE, difficulty: str = "medium") -> Room:
+    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium") -> Room:
         code = self._generate_unique_code()
         host = Player(player_id=host_id, name=host_name, is_host=True)
         room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty)
 
-        # Générer le puzzle immédiatement
+        # Générer le puzzle
         puzzle, solution = SudokuEngine.generate_puzzle(difficulty)
         room.initial_puzzle = puzzle
         room.solution = solution
         room.shared_grid = copy.deepcopy(puzzle)
-
-        # Attribuer la grille au host
         host.grid = copy.deepcopy(puzzle)
 
-        # Si mode Solo AI, inscrire automatiquement le bot comme adversaire
+        # Si mode Solo AI, inscrire automatiquement le bot comme Joueur 2
         if mode == GameMode.SOLO_AI:
             bot_player = Player(player_id="bot_ki_fraid", name="KI FRAID 🤖", is_host=False)
             bot_player.grid = copy.deepcopy(puzzle)
@@ -121,27 +164,21 @@ class RoomManager:
         return room
 
     def join_room(self, room_code: str, player_id: str, player_name: str) -> Tuple[Room, str]:
-        """
-        Rejoint un salon. Renvoie (Room, rôle) avec rôle in ['player', 'spectator'].
-        """
         code = room_code.upper().strip()
         room = self.rooms.get(code)
         if not room:
             raise ValueError(f"Salon '{code}' introuvable.")
 
-        # Reconnexion d'un joueur existant
         if player_id in room.players:
             room.players[player_id].is_connected = True
             return room, "player"
 
-        # Rejoindre en tant que Joueur 2 si disponible et non démarré
         if not room.is_full and room.state == RoomState.WAITING:
             new_player = Player(player_id=player_id, name=player_name, is_host=False)
             new_player.grid = copy.deepcopy(room.initial_puzzle)
             room.players[player_id] = new_player
             return room, "player"
 
-        # Sinon, rejoindre en tant que spectateur
         if player_id not in room.spectators:
             room.spectators.append(player_id)
         return room, "spectator"
@@ -153,11 +190,14 @@ class RoomManager:
 
         room.state = RoomState.IN_GAME
         room.start_time = time.time()
+        room.turn_start_time = time.time()
+        # Le premier joueur actif est l'hôte
+        room.current_turn_player_id = room.player_list[0].player_id
         return room
 
     def play_move(self, room_code: str, player_id: str, row: int, col: int, value: int) -> Dict:
         """
-        Valide et applique un coup soumis par un joueur.
+        Valide et applique un coup soumis par un joueur avec arbitrage du tour et du score.
         """
         room = self.rooms.get(room_code)
         if not room:
@@ -169,27 +209,45 @@ class RoomManager:
         if not player:
             raise ValueError("Joueur non autorisé dans ce salon.")
 
-        target_grid = room.shared_grid if room.mode == GameMode.CLASH else player.grid
+        # En mode Clash ou Solo AI : vérifier impérativement si c'est son tour
+        if room.mode in (GameMode.CLASH, GameMode.SOLO_AI):
+            if player_id != room.current_turn_player_id:
+                return {
+                    "valid": False,
+                    "rejected": True,
+                    "reason": "Ce n'est pas votre tour !",
+                    "current_turn": room.current_turn_player_id
+                }
 
-        # Vérifier que la case n'est pas déjà fixée
+        target_grid = room.shared_grid if room.mode in (GameMode.CLASH, GameMode.SOLO_AI) else player.grid
+
+        # Case déjà remplie
         if target_grid[row][col] != 0:
-            return {"valid": False, "reason": "Cell already filled"}
+            return {"valid": False, "rejected": True, "reason": "Cette case est déjà remplie."}
 
-        # Validation autoritaire contre la solution secrète
+        time_taken = time.time() - (room.turn_start_time or time.time())
         is_valid = SudokuEngine.validate_move(room.solution, row, col, value)
 
         if is_valid:
             target_grid[row][col] = value
-            player.score += 10
+            base_pts, bonus_pts = room.calculate_points_and_bonus(time_taken)
+            points_gained = base_pts + bonus_pts
+            player.score += points_gained
             player.progress = room.calculate_progress(target_grid)
 
-            # Vérifier si ce joueur a fini
-            if player.progress >= 100.0:
-                player.finished = True
-                player.finish_time = time.time() - (room.start_time or time.time())
-                room.winner_id = player.player_id
+            # En mode Clash/Solo AI, chaque coup joué passe la main pour un vrai duel interactif tour par tour
+            next_player = room.switch_turn() if room.mode in (GameMode.CLASH, GameMode.SOLO_AI) else room.current_turn_player_id
+
+            # Vérifier si la grille est totalement complétée
+            is_completed = (player.progress >= 100.0) or all(cell != 0 for r in target_grid for cell in r)
+            if is_completed:
                 room.state = RoomState.FINISHED
                 room.end_time = time.time()
+                # En mode Clash, le gagnant est celui qui a le plus haut score !
+                scores = {p.player_id: p.score for p in room.player_list}
+                highest_score = max(scores.values())
+                winners = [pid for pid, sc in scores.items() if sc == highest_score]
+                room.winner_id = winners[0] if len(winners) == 1 else "DRAW"
 
             return {
                 "valid": True,
@@ -198,13 +256,21 @@ class RoomManager:
                 "value": value,
                 "player_id": player_id,
                 "score": player.score,
+                "points_gained": points_gained,
+                "bonus_gained": bonus_pts,
                 "progress": player.progress,
+                "current_turn": next_player,
+                "turn_switched": (room.mode in (GameMode.CLASH, GameMode.SOLO_AI)),
+                "shared_grid": target_grid,
                 "game_over": room.state == RoomState.FINISHED,
                 "winner_id": room.winner_id
             }
         else:
+            # ERREUR : pénalité de 1 point et PASSAGE DE TOUR IMMÉDIAT
             player.mistakes += 1
-            player.score = max(0, player.score - 5)  # Pénalité
+            player.score = max(0.0, player.score - 1.0)
+            next_player = room.switch_turn() if room.mode in (GameMode.CLASH, GameMode.SOLO_AI) else room.current_turn_player_id
+
             return {
                 "valid": False,
                 "row": row,
@@ -213,8 +279,29 @@ class RoomManager:
                 "player_id": player_id,
                 "score": player.score,
                 "mistakes": player.mistakes,
+                "current_turn": next_player,
+                "turn_switched": True,
                 "game_over": False
             }
+
+    def timeout_turn(self, room_code: str) -> Optional[Dict]:
+        """Déclenché quand le chrono du tour expire."""
+        room = self.rooms.get(room_code)
+        if not room or room.state != RoomState.IN_GAME:
+            return None
+
+        current_player = room.players.get(room.current_turn_player_id)
+        if current_player:
+            current_player.score = max(0.0, current_player.score - 1.0)
+            current_player.mistakes += 1
+
+        next_player = room.switch_turn()
+        return {
+            "timeout": True,
+            "timed_out_player_id": current_player.player_id if current_player else None,
+            "score": current_player.score if current_player else 0.0,
+            "current_turn": next_player
+        }
 
     def leave_room(self, room_code: str, player_id: str):
         room = self.rooms.get(room_code)
@@ -223,18 +310,7 @@ class RoomManager:
 
         if player_id in room.players:
             room.players[player_id].is_connected = False
-            # Si le salon est encore en attente et que l'hôte quitte, supprimer le salon
             if room.state == RoomState.WAITING and room.players[player_id].is_host:
                 del self.rooms[room_code]
         elif player_id in room.spectators:
             room.spectators.remove(player_id)
-
-    def cleanup_old_rooms(self, max_idle_seconds: int = 600):
-        """Supprime les salons inactifs depuis plus de max_idle_seconds."""
-        now = time.time()
-        to_delete = [
-            code for code, room in self.rooms.items()
-            if now - room.created_at > max_idle_seconds and room.state == RoomState.FINISHED
-        ]
-        for code in to_delete:
-            del self.rooms[code]
