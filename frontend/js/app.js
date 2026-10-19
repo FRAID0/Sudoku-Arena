@@ -636,6 +636,7 @@ dom.btnCreateRoom.addEventListener("click", async () => {
 
         dom.lobbySection.classList.add("hidden");
         dom.gameSection.classList.remove("hidden");
+        if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
         buildBoardUI(data.initial_puzzle);
 
         connectWebSocket(state.roomCode);
@@ -657,6 +658,7 @@ dom.btnJoinRoom.addEventListener("click", () => {
     dom.displayRoomCode.textContent = state.roomCode;
     dom.lobbySection.classList.add("hidden");
     dom.gameSection.classList.remove("hidden");
+    if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
 
     connectWebSocket(state.roomCode);
 });
