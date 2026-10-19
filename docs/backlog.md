@@ -157,3 +157,61 @@
 
 #### `[#16 - P2]` Test de Résilience & Chaos Monkey manuel
 - **Critères d'acceptation :** Supprimer un Pod (`kubectl delete pod ...`) pendant une partie et vérifier le rétablissement automatique par Kubernetes.
+
+---
+
+### 🔷 EPIC 6 : Gameplay V2, Ergonomie Zéro-Scroll & Robustesse Frontend (M6)
+
+#### `[#17 - P0]` Validation Duale Backend : Mode Simple (Local) vs Mode Casse-Tête (Strict)
+- **Critères d'acceptation :**
+  1. Le backend accepte un paramètre `validation_mode`: `"simple"` ou `"strict"`.
+  2. En mode `"simple"` (défaut) : tout chiffre respectant ligne, colonne et carré 3x3 actuel est validé (`is_valid_placement`).
+  3. En mode `"strict"` : seule la solution finale unique secrète est acceptée.
+  4. Messages explicites de rejet (`"reason"` dans le payload WebSocket).
+
+#### `[#18 - P0]` Layout Zéro-Scroll (Single-Screen Viewport 100dvh)
+- **Critères d'acceptation :**
+  1. Hauteur totale verrouillée à `100dvh` sans aucun scroll vertical sur mobile comme sur desktop.
+  2. Grille, bandeau LED, chrono et scoreboards visibles en permanence.
+  3. Masquage dynamique du header de marque dès le démarrage de la manche (`.arena-container.in-game`).
+
+#### `[#19 - P1]` Refonte du Bandeau LED & Signalétique Tour par Tour
+- **Critères d'acceptation :**
+  1. Animations douces avec transitions fondues de 400 à 600ms (fini le flash instantané).
+  2. Indicateur visuel clair du joueur actif : pixels 0 à 14 allumés en bleu cyan pour P1, pixels 15 à 29 allumés en violet néon pour P2/KI FRAID.
+  3. Effets de feedback doux : impulsion verte sur coup juste, onde rouge sur coup faux/timeout.
+
+#### `[#20 - P1]` Système de Notifications Toasts & Feedbacks de Rejet
+- **Critères d'acceptation :**
+  1. Affichage clair d'un toast d'alerte lors d'un coup refusé (ex: "Ce n'est pas votre tour !", "Case déjà remplie", "Chiffre déjà présent sur la ligne/colonne/carré").
+  2. Sécurisation stricte de l'UI : empêcher toute modification erronée de la jauge de progression lors d'un coup invalide.
+
+#### `[#21 - P1]` Robustesse WebSocket, Statut Réseau & Config Multi-Environnement
+- **Critères d'acceptation :**
+  1. Badge d'état de connexion visible (🟢 En ligne, 🟠 Reconnexion, 🔴 Déconnecté).
+  2. Reconnexion automatique intelligente (tentatives espacées) sans blocage silencieux.
+  3. Détection dynamique de l'URL du backend (local `localhost` vs Cloud Northflank, avec surcharge possible via paramètre d'URL `?backend=...`).
+
+#### `[#22 - P2]` Accessibilité Clavier & Ergonomie Tactile Mobile
+- **Critères d'acceptation :**
+  1. Navigation complète au clavier : flèches directionnelles (Haut, Bas, Gauche, Droite) pour déplacer la sélection de cellule.
+  2. Touches 1-9 pour jouer, `Suppr` / `Retour arrière` pour effacer.
+  3. Focus visuel net avec contour néon sur la cellule active.
+  4. Pavé tactile adaptatif sans débordement sur petits écrans.
+
+---
+
+## 🏛️ Stratégie d'Architecture DevOps & Démonstration Portfolio
+
+Pour valoriser le projet auprès des recruteurs et sur LinkedIn sans frais d'infrastructure :
+
+1. **Environnement A — Démo Publique Live (100% Gratuit) :**
+   - **Frontend :** Vercel (Hébergement Edge mondial, CDN HTTPS gratuit, déploiement automatique sur `git push origin main`).
+   - **Backend :** Northflank Developer Sandbox (Conteneur FastAPI / WebSockets toujours actif sans mise en veille, certifié $0 avec vérification CB).
+   - **Objectif :** Permettre à n'importe quel recruteur de tester instantanément un duel en direct depuis deux navigateurs.
+
+2. **Environnement B — Laboratoire Kubernetes Local (Démonstration Avancée) :**
+   - **Cluster :** Docker Desktop avec cluster local `kind` (6 pods : 3 réplicas backend, 2 réplicas frontend, 1 broker Mosquitto).
+   - **Compétences validées :** Deployments, Services (ClusterIP, LoadBalancer), ConfigMaps, Liveness & Readiness Probes, Self-Healing vérifié (<2s lors du kill d'un pod).
+   - **CI/CD :** Pipeline GitHub Actions automatisé (`.github/workflows/ci.yml`) avec validation `pytest`, build Docker et `kubectl dry-run`.
+   - **Évolution future (V3) :** Intégration de Redis pour synchroniser les salons entre plusieurs réplicas backend en production.

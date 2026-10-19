@@ -1,7 +1,8 @@
 /**
  * Sudoku Arena — Frontend Game Engine & WebSocket Client
  * Gère le décompte synchrone, le mode Clash (Tour par Tour), le mode Course,
- * le bot KI FRAID, l'audio synthétique et le ruban LED IoT.
+ * le bot KI FRAID, l'audio synthétique, le ruban LED IoT, l'accessibilité clavier,
+ * la robustesse WebSocket et la validation duale (Simple vs Casse-Tête).
  */
 
 // Audio Web synthétique (sans fichier externe)
@@ -31,12 +32,15 @@ function playBeep(frequency = 440, duration = 0.15) {
     }
 }
 
-// Détection dynamique de l'URL du Backend :
+// Détection dynamique et flexible de l'URL du Backend :
+// - Surcharge via query param : ?backend=...
 // - En local (localhost / 127.0.0.1) : utilise le proxy local / Nginx
 // - En production (Vercel, etc.) : utilise le cluster Northflank en HTTPS/WSS
-const IS_LOCAL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-const BACKEND_HOST = IS_LOCAL ? window.location.host : "p01--sudoku-backend--hvzj8dcpgjs4.code.run";
-const API_BASE_URL = IS_LOCAL ? "" : `https://${BACKEND_HOST}`;
+const urlParams = new URLSearchParams(window.location.search);
+const customBackend = urlParams.get("backend");
+const IS_LOCAL = !customBackend && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+const BACKEND_HOST = customBackend || (IS_LOCAL ? window.location.host : "p01--sudoku-backend--hvzj8dcpgjs4.code.run");
+const API_BASE_URL = customBackend ? `https://${customBackend}` : (IS_LOCAL ? "" : `https://${BACKEND_HOST}`);
 
 // État de l'application
 const state = {
@@ -46,22 +50,31 @@ const state = {
     isHost: false,
     mode: "clash", // "clash" | "race" | "solo_ai"
     difficulty: "medium",
+    validationMode: "simple", // "simple" | "strict"
     selectedCell: null,
     grid: null,
     socket: null,
     isAiMatch: false,
     currentTurn: null,
     turnTimeout: 20.0,
-    timerInterval: null
+    timerInterval: null,
+    reconnectAttempts: 0,
+    maxReconnectAttempts: 5,
+    reconnectTimeout: null
 };
 
 // Éléments du DOM
 const dom = {
+    arenaContainer: document.querySelector(".arena-container"),
     lobbySection: document.getElementById("lobbySection"),
     gameSection: document.getElementById("gameSection"),
     playerNameInput: document.getElementById("playerName"),
     gameModeSelect: document.getElementById("gameMode"),
+    validationMode: document.getElementById("validationMode"),
+    validationHelp: document.getElementById("validationHelp"),
     difficultySelect: document.getElementById("gameDifficulty"),
+    aiValidationMode: document.getElementById("aiValidationMode"),
+    aiValidationHelp: document.getElementById("aiValidationHelp"),
     aiDifficultySelect: document.getElementById("aiDifficulty"),
     btnCreateRoom: document.getElementById("btnCreateRoom"),
     btnJoinRoom: document.getElementById("btnJoinRoom"),
@@ -76,6 +89,10 @@ const dom = {
     sudokuGrid: document.getElementById("sudokuGrid"),
     controlsContainer: document.querySelector(".controls-container"),
     ledStrip: document.getElementById("ledStrip"),
+    networkBadge: document.getElementById("networkBadge"),
+    networkStatusText: document.getElementById("networkStatusText"),
+    networkDot: document.getElementById("networkDot"),
+    toastNotification: document.getElementById("toastNotification"),
     p1Card: document.getElementById("p1Card"),
     p2Card: document.getElementById("p2Card"),
     p1Name: document.getElementById("p1Name"),
@@ -97,6 +114,29 @@ const dom = {
     btnBackLobby: document.getElementById("btnBackLobby")
 };
 
+// Système de Toast de Notification (Non intrusif)
+let toastTimeout = null;
+function showToast(message, type = "error", duration = 3200) {
+    if (!dom.toastNotification) return;
+    clearTimeout(toastTimeout);
+    dom.toastNotification.textContent = message;
+    dom.toastNotification.className = `toast-notification ${type}`;
+    dom.toastNotification.classList.remove("hidden");
+    toastTimeout = setTimeout(() => {
+        dom.toastNotification.classList.add("hidden");
+    }, duration);
+}
+
+// Mise à jour de l'indicateur de statut réseau
+function updateNetworkStatus(status, text) {
+    if (!dom.networkBadge || !dom.networkStatusText) return;
+    dom.networkBadge.className = `network-badge ${status}`;
+    dom.networkStatusText.textContent = text;
+    if (dom.networkDot) {
+        dom.networkDot.className = `pulse-dot ${status === "online" ? "" : status}`;
+    }
+}
+
 // Initialisation du bandeau LED virtuel (30 pixels WS2812B)
 function initVirtualLedStrip() {
     if (!dom.ledStrip) return;
@@ -108,26 +148,54 @@ function initVirtualLedStrip() {
     }
 }
 
-function triggerLedEffect(effect) {
+// Éclairage doux du bandeau LED par camp (Joueur 1 Gauche / Joueur 2 Droite)
+function updateLedTurnLighting(isP1Turn) {
     const pixels = document.querySelectorAll(".led-pixel");
     pixels.forEach((p, idx) => {
         p.className = "led-pixel";
-        if (effect === "success") {
-            setTimeout(() => { p.classList.add("green"); }, idx * 8);
-            setTimeout(() => { p.className = "led-pixel"; }, 600);
-        } else if (effect === "error") {
-            p.classList.add("red");
-            setTimeout(() => { p.className = "led-pixel"; }, 400);
-        } else if (effect === "blue") {
-            setTimeout(() => { p.classList.add("blue"); }, idx * 8);
-            setTimeout(() => { p.className = "led-pixel"; }, 500);
-        } else if (effect === "victory") {
-            setTimeout(() => { p.classList.add("rainbow"); }, idx * 15);
+        if (state.mode === "race") {
+            p.classList.add("blue");
+        } else if (isP1Turn) {
+            if (idx < 15) {
+                p.classList.add("active-p1");
+            } else {
+                p.classList.add("dim");
+            }
+        } else {
+            if (idx >= 15) {
+                p.classList.add("active-p2");
+            } else {
+                p.classList.add("dim");
+            }
         }
     });
 }
 
-// Construction de la grille 9x9
+// Animations du bandeau LED lors des événements
+function triggerLedEffect(effect) {
+    const pixels = document.querySelectorAll(".led-pixel");
+    pixels.forEach((p, idx) => {
+        if (effect === "success") {
+            setTimeout(() => { 
+                p.classList.remove("red", "active-p1", "active-p2", "dim");
+                p.classList.add("green"); 
+            }, idx * 8);
+            setTimeout(() => {
+                if (state.currentTurn) updateLedTurnLighting(state.currentTurn === state.playerId);
+            }, 600);
+        } else if (effect === "error") {
+            p.classList.remove("green", "active-p1", "active-p2", "dim");
+            p.classList.add("red");
+            setTimeout(() => {
+                if (state.currentTurn) updateLedTurnLighting(state.currentTurn === state.playerId);
+            }, 450);
+        } else if (effect === "victory") {
+            setTimeout(() => { p.className = "led-pixel rainbow"; }, idx * 15);
+        }
+    });
+}
+
+// Construction de la grille 9x9 avec accessibilité
 function buildBoardUI(initialPuzzle) {
     dom.sudokuGrid.innerHTML = "";
     state.grid = JSON.parse(JSON.stringify(initialPuzzle));
@@ -138,14 +206,19 @@ function buildBoardUI(initialPuzzle) {
             cell.className = "cell";
             cell.dataset.row = r;
             cell.dataset.col = c;
+            cell.tabIndex = 0; // Accessible au focus clavier
+            cell.setAttribute("role", "gridcell");
+            cell.setAttribute("aria-label", `Ligne ${r + 1}, Colonne ${c + 1}`);
 
             const val = initialPuzzle[r][c];
             if (val !== 0) {
                 cell.textContent = val;
                 cell.classList.add("fixed");
+                cell.setAttribute("aria-readonly", "true");
             }
 
             cell.addEventListener("click", () => selectCell(r, c));
+            cell.addEventListener("focus", () => selectCell(r, c));
             dom.sudokuGrid.appendChild(cell);
         }
     }
@@ -163,7 +236,7 @@ function selectCell(row, col) {
     if (cellEl) cellEl.classList.add("selected");
 
     // L'aide visuelle (surlignage ligne, colonne, bloc 3x3 et chiffres identiques)
-    // est réservée au mode Facile (Novice). En Moyen et Difficile, le joueur doit rester 100% focus.
+    // est réservée au mode Facile (Novice). En Moyen et Difficile, le joueur reste concentré.
     if (state.difficulty === "easy") {
         const boxRowStart = Math.floor(row / 3) * 3;
         const boxColStart = Math.floor(col / 3) * 3;
@@ -186,7 +259,7 @@ function selectCell(row, col) {
         });
     }
 
-    // Si la case est déjà fixée/remplie ou si ce n'est pas notre tour, elle n'est pas modifiable
+    // Si la case est déjà fixée/remplie ou si ce n'est pas notre tour
     if (isFilled || ((state.mode === "clash" || state.mode === "solo_ai") && state.currentTurn && state.currentTurn !== state.playerId)) {
         state.selectedCell = null;
         return;
@@ -198,11 +271,16 @@ function selectCell(row, col) {
 function handleInput(number) {
     // Vérification du tour en mode Clash
     if ((state.mode === "clash" || state.mode === "solo_ai") && state.currentTurn && state.currentTurn !== state.playerId) {
-        playBeep(180, 0.15); // Bloqué
+        playBeep(180, 0.15);
+        showToast("⏳ Ce n'est pas votre tour !", "error");
         return;
     }
 
-    if (!state.selectedCell) return;
+    if (!state.selectedCell) {
+        showToast("Sélectionnez d'abord une case vide !", "info");
+        return;
+    }
+
     const { row, col } = state.selectedCell;
 
     if (state.socket && state.socket.readyState === WebSocket.OPEN) {
@@ -212,6 +290,8 @@ function handleInput(number) {
             col: col,
             value: number
         }));
+    } else {
+        showToast("Connexion au serveur interrompue...", "error");
     }
 }
 
@@ -261,6 +341,7 @@ function updateTurnUI(currentTurnPlayerId, timeoutSeconds) {
         if (dom.p2Card) dom.p2Card.classList.remove("active-turn", "is-p2");
         dom.sudokuGrid.classList.remove("disabled-turn");
         if (dom.controlsContainer) dom.controlsContainer.classList.remove("disabled-turn");
+        updateLedTurnLighting(true);
         return;
     }
 
@@ -277,7 +358,7 @@ function updateTurnUI(currentTurnPlayerId, timeoutSeconds) {
         if (dom.p2Card) dom.p2Card.classList.remove("active-turn", "is-p2");
         dom.sudokuGrid.classList.remove("disabled-turn");
         if (dom.controlsContainer) dom.controlsContainer.classList.remove("disabled-turn");
-        playBeep(587.33, 0.12); // Ton de notification de prise de main (Ré)
+        playBeep(587.33, 0.12); // Ton de notification (Ré)
     } else {
         const oppName = (state.isAiMatch ? "KI FRAID" : (dom.p2Name.textContent || "Adversaire")).replace(" (Moi)", "");
         if (dom.turnLabel) {
@@ -296,18 +377,22 @@ function updateTurnUI(currentTurnPlayerId, timeoutSeconds) {
         state.selectedCell = null;
     }
 
+    updateLedTurnLighting(isMyTurn);
     startTurnTimer(timeoutSeconds || state.turnTimeout);
 }
 
-// Connexion WebSocket
+// Connexion WebSocket avec reconnexion automatique
 function connectWebSocket(roomCode, onOpenCallback = null) {
     const protocol = (window.location.protocol === "https:" || !IS_LOCAL) ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${BACKEND_HOST}/ws/${roomCode}/${state.playerId}/${encodeURIComponent(state.playerName)}`;
 
+    updateNetworkStatus("reconnecting", "🟠 CONNEXION...");
     state.socket = new WebSocket(wsUrl);
 
     state.socket.onopen = () => {
         console.log("WebSocket connecté au salon :", roomCode);
+        state.reconnectAttempts = 0;
+        updateNetworkStatus("online", "🟢 EN LIGNE");
         if (onOpenCallback) onOpenCallback();
     };
 
@@ -328,6 +413,9 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
             state.turnTimeout = msg.turn_timeout || 20.0;
             state.currentTurn = msg.current_turn;
 
+            // Verrouiller la vue en 100dvh zéro-scroll
+            if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
+
             if (msg.shared_grid && (state.mode === "clash" || state.mode === "solo_ai")) {
                 buildBoardUI(msg.shared_grid);
             } else {
@@ -339,8 +427,12 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
             updateTurnUI(msg.current_turn, state.turnTimeout);
         } else if (msg.event === "MOVE_RESULT") {
             const res = msg.result;
+
+            // Cas de coup rejeté (ex: pas ton tour, case déjà remplie, hors bornes)
             if (res.rejected) {
                 playBeep(180, 0.2);
+                const reason = res.reason || "Coup rejeté par le serveur.";
+                showToast(`⚠️ ${reason}`, "error");
                 return;
             }
 
@@ -367,18 +459,30 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
                 }
                 triggerLedEffect("error");
                 playBeep(220, 0.25);
+                if (res.player_id === state.playerId) {
+                    const reason = res.reason || "Chiffre incorrect ou conflit !";
+                    showToast(`❌ ${reason}`, "error");
+                }
             }
 
-            // Mise à jour des scores
+            // Sécurisation stricte : mise à jour des scores et progression uniquement si disponible
             if (res.player_id === state.playerId) {
-                dom.p1Score.textContent = `${res.score} pts`;
-                dom.p1ProgressFill.style.width = `${res.progress}%`;
+                if (res.score !== undefined) {
+                    dom.p1Score.textContent = `${res.score} pts`;
+                }
+                if (res.valid && res.progress !== undefined) {
+                    dom.p1ProgressFill.style.width = `${res.progress}%`;
+                }
             } else {
-                dom.p2Score.textContent = `${res.score} pts`;
-                dom.p2ProgressFill.style.width = `${res.progress}%`;
+                if (res.score !== undefined) {
+                    dom.p2Score.textContent = `${res.score} pts`;
+                }
+                if (res.valid && res.progress !== undefined) {
+                    dom.p2ProgressFill.style.width = `${res.progress}%`;
+                }
             }
 
-            // Gestion de l'alternance de tour
+            // Alternance du tour en Clash
             if (state.mode === "clash" || state.mode === "solo_ai") {
                 state.currentTurn = res.current_turn;
                 updateTurnUI(res.current_turn, state.turnTimeout);
@@ -391,12 +495,14 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
         } else if (msg.event === "TURN_TIMEOUT") {
             const res = msg.result;
             triggerLedEffect("error");
-            playBeep(196, 0.3); // Son d'expiration buzzer
+            playBeep(196, 0.3);
 
             if (res.timed_out_player_id === state.playerId) {
                 dom.p1Score.textContent = `${res.score} pts`;
+                showToast("⏰ Temps écoulé ! Pénalité de 1 point.", "error");
             } else {
                 dom.p2Score.textContent = `${res.score} pts`;
+                showToast("⏰ Temps écoulé pour l'adversaire !", "info");
             }
 
             state.currentTurn = res.current_turn;
@@ -407,6 +513,23 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
     state.socket.onclose = () => {
         console.log("WebSocket déconnecté.");
         stopTurnTimer();
+
+        // Tentative de reconnexion automatique si nous sommes en partie
+        if (state.roomCode && state.reconnectAttempts < state.maxReconnectAttempts) {
+            state.reconnectAttempts++;
+            updateNetworkStatus("reconnecting", `🟠 RECONNEXION (${state.reconnectAttempts}/${state.maxReconnectAttempts})...`);
+            clearTimeout(state.reconnectTimeout);
+            state.reconnectTimeout = setTimeout(() => {
+                connectWebSocket(state.roomCode);
+            }, Math.min(1000 * Math.pow(1.5, state.reconnectAttempts), 8000));
+        } else if (state.reconnectAttempts >= state.maxReconnectAttempts) {
+            updateNetworkStatus("offline", "🔴 DÉCONNECTÉ");
+            showToast("Connexion au serveur perdue. Rafraîchissez la page.", "error", 6000);
+        }
+    };
+
+    state.socket.onerror = (err) => {
+        console.error("Erreur WebSocket :", err);
     };
 }
 
@@ -442,13 +565,32 @@ function showGameOver(isWinner, isDraw = false) {
     playBeep(isWinner ? 880 : 180, 0.6);
 }
 
-// Navigation & Actions
+// Mise à jour des explications des règles de validation
+const updateValidationHelp = (selectEl, helpEl) => {
+    if (!selectEl || !helpEl) return;
+    if (selectEl.value === "simple") {
+        helpEl.textContent = "✨ Mode Simple : Tout chiffre valide selon les règles Sudoku est accepté";
+    } else {
+        helpEl.textContent = "🧩 Mode Casse-Tête : Seule la solution finale unique est acceptée (Puriste)";
+    }
+};
+
+if (dom.validationMode && dom.validationHelp) {
+    dom.validationMode.addEventListener("change", () => updateValidationHelp(dom.validationMode, dom.validationHelp));
+}
+if (dom.aiValidationMode && dom.aiValidationHelp) {
+    dom.aiValidationMode.addEventListener("change", () => updateValidationHelp(dom.aiValidationMode, dom.aiValidationHelp));
+}
+
+// Actions du Lobby
 dom.btnCreateRoom.addEventListener("click", async () => {
     state.playerName = dom.playerNameInput.value.trim() || "Joueur 1";
     const difficulty = dom.difficultySelect.value;
     const mode = dom.gameModeSelect ? dom.gameModeSelect.value : "clash";
+    const validationMode = dom.validationMode ? dom.validationMode.value : "simple";
     state.mode = mode;
     state.difficulty = difficulty;
+    state.validationMode = validationMode;
 
     try {
         const res = await fetch(`${API_BASE_URL}/api/rooms`, {
@@ -458,7 +600,8 @@ dom.btnCreateRoom.addEventListener("click", async () => {
                 host_id: state.playerId,
                 host_name: state.playerName,
                 mode: mode,
-                difficulty: difficulty
+                difficulty: difficulty,
+                validation_mode: validationMode
             })
         });
         const data = await res.json();
@@ -467,7 +610,9 @@ dom.btnCreateRoom.addEventListener("click", async () => {
 
         dom.displayRoomCode.textContent = state.roomCode;
         if (dom.displayModeBadge) {
-            dom.displayModeBadge.textContent = mode === "clash" ? "⚡ CLASH" : "🏎️ COURSE";
+            const modeName = mode === "clash" ? "⚡ CLASH" : "🏎️ COURSE";
+            const valName = validationMode === "simple" ? "SIMPLE" : "STRICT";
+            dom.displayModeBadge.textContent = `${modeName} [${valName}]`;
         }
 
         dom.lobbySection.classList.add("hidden");
@@ -476,14 +621,14 @@ dom.btnCreateRoom.addEventListener("click", async () => {
 
         connectWebSocket(state.roomCode);
     } catch (err) {
-        alert("Erreur lors de la création du salon : " + err);
+        showToast("Erreur lors de la création du salon : " + err, "error");
     }
 });
 
 dom.btnJoinRoom.addEventListener("click", () => {
     const code = dom.joinCodeInput.value.trim().toUpperCase();
     if (code.length !== 4) {
-        alert("Code à 4 lettres invalide.");
+        showToast("Code à 4 lettres invalide.", "error");
         return;
     }
     state.playerName = dom.playerNameInput.value.trim() || "Challenger";
@@ -504,7 +649,9 @@ dom.btnPlayAi.addEventListener("click", async () => {
     state.isHost = true;
     state.mode = "solo_ai";
     const chosenDiff = dom.aiDifficultySelect ? dom.aiDifficultySelect.value : "medium";
+    const validationMode = dom.aiValidationMode ? dom.aiValidationMode.value : "simple";
     state.difficulty = chosenDiff;
+    state.validationMode = validationMode;
 
     try {
         const res = await fetch(`${API_BASE_URL}/api/rooms`, {
@@ -514,7 +661,8 @@ dom.btnPlayAi.addEventListener("click", async () => {
                 host_id: state.playerId,
                 host_name: state.playerName,
                 mode: "solo_ai",
-                difficulty: chosenDiff
+                difficulty: chosenDiff,
+                validation_mode: validationMode
             })
         });
         const data = await res.json();
@@ -525,7 +673,8 @@ dom.btnPlayAi.addEventListener("click", async () => {
 
         dom.displayRoomCode.textContent = "VS-AI";
         if (dom.displayModeBadge) {
-            dom.displayModeBadge.textContent = `🤖 VS KI FRAID (${diffName})`;
+            const valName = validationMode === "simple" ? "SIMPLE" : "STRICT";
+            dom.displayModeBadge.textContent = `🤖 KI FRAID (${diffName}) [${valName}]`;
         }
         dom.p1Name.textContent = state.playerName + " (Moi)";
         dom.p2Name.textContent = `KI FRAID (${diffName}) 🤖`;
@@ -546,7 +695,7 @@ dom.btnPlayAi.addEventListener("click", async () => {
             }, 300);
         });
     } catch (err) {
-        alert("Erreur démarrage solo IA : " + err);
+        showToast("Erreur démarrage solo IA : " + err, "error");
     }
 });
 
@@ -570,6 +719,7 @@ dom.btnRematch.addEventListener("click", () => {
 
 dom.btnErase.addEventListener("click", () => {
     if ((state.mode === "clash" || state.mode === "solo_ai") && state.currentTurn && state.currentTurn !== state.playerId) {
+        showToast("Ce n'est pas votre tour !", "error");
         return;
     }
     if (state.selectedCell) {
@@ -581,7 +731,7 @@ dom.btnErase.addEventListener("click", () => {
     }
 });
 
-// Pavé Tactile & Clavier
+// Pavé Tactile
 document.querySelectorAll(".numpad-btn").forEach(btn => {
     btn.addEventListener("click", () => {
         const val = parseInt(btn.dataset.val, 10);
@@ -589,8 +739,18 @@ document.querySelectorAll(".numpad-btn").forEach(btn => {
     });
 });
 
+// Accessibilité & Navigation Clavier Complète
 window.addEventListener("keydown", (e) => {
-    if (e.key >= "1" && e.key <= "9") {
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+        let curRow = state.selectedCell ? state.selectedCell.row : 0;
+        let curCol = state.selectedCell ? state.selectedCell.col : 0;
+        if (e.key === "ArrowUp") curRow = Math.max(0, curRow - 1);
+        if (e.key === "ArrowDown") curRow = Math.min(8, curRow + 1);
+        if (e.key === "ArrowLeft") curCol = Math.max(0, curCol - 1);
+        if (e.key === "ArrowRight") curCol = Math.min(8, curCol + 1);
+        selectCell(curRow, curCol);
+    } else if (e.key >= "1" && e.key <= "9") {
         handleInput(parseInt(e.key, 10));
     } else if (e.key === "Backspace" || e.key === "Delete") {
         dom.btnErase.click();

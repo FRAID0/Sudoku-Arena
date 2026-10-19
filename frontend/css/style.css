@@ -27,18 +27,29 @@ body {
     color: var(--text-primary);
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
     min-height: 100vh;
+    min-height: 100dvh;
+    height: 100dvh;
+    overflow: hidden; /* ZÉRO SCROLL : tout tient sur un seul écran */
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 16px;
+    padding: 8px 12px;
 }
 
 .arena-container {
     width: 100%;
-    max-width: 960px;
+    max-width: 980px;
+    height: 100%;
+    max-height: 100dvh;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    justify-content: flex-start;
+    gap: 8px;
+}
+
+/* En cours de partie, masquer le gros titre pour maximiser l'espace de la grille */
+.arena-container.in-game .brand-header {
+    display: none;
 }
 
 /* Bandeau LED Virtuel IoT */
@@ -52,6 +63,7 @@ body {
 
 .led-bar-label {
     display: flex;
+    justify-content: space-between;
     align-items: center;
     gap: 8px;
     font-family: 'JetBrains Mono', monospace;
@@ -61,6 +73,53 @@ body {
     margin-bottom: 8px;
 }
 
+.iot-title-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.network-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: #94a3b8;
+    background: rgba(15, 23, 42, 0.7);
+    padding: 3px 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-weight: 700;
+    transition: all 0.3s ease;
+}
+
+.network-badge.online {
+    color: var(--neon-green);
+    border-color: rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.2);
+}
+
+.network-badge.reconnecting {
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.4);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.2);
+}
+
+.network-badge.offline {
+    color: var(--neon-red);
+    border-color: rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+.helper-text {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 4px;
+    display: block;
+    line-height: 1.3;
+    font-style: italic;
+}
+
 .pulse-dot {
     width: 8px;
     height: 8px;
@@ -68,6 +127,16 @@ body {
     border-radius: 50%;
     box-shadow: 0 0 8px var(--neon-green);
     animation: pulse 1.5s infinite;
+}
+
+.pulse-dot.reconnecting {
+    background: #f59e0b;
+    box-shadow: 0 0 8px #f59e0b;
+}
+
+.pulse-dot.offline {
+    background: var(--neon-red);
+    box-shadow: 0 0 8px var(--neon-red);
 }
 
 @keyframes pulse {
@@ -85,17 +154,31 @@ body {
 .led-pixel {
     background: #1e293b;
     border-radius: 3px;
-    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    transition: background-color 0.45s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.45s ease, opacity 0.45s ease;
+}
+
+.led-pixel.active-p1 {
+    background: var(--neon-blue);
+    box-shadow: 0 0 10px var(--neon-blue);
+}
+
+.led-pixel.active-p2 {
+    background: var(--neon-purple);
+    box-shadow: 0 0 10px var(--neon-purple);
+}
+
+.led-pixel.dim {
+    opacity: 0.25;
 }
 
 .led-pixel.green {
     background: var(--neon-green);
-    box-shadow: 0 0 10px var(--neon-green);
+    box-shadow: 0 0 12px var(--neon-green);
 }
 
 .led-pixel.red {
     background: var(--neon-red);
-    box-shadow: 0 0 10px var(--neon-red);
+    box-shadow: 0 0 12px var(--neon-red);
 }
 
 .led-pixel.blue {
@@ -105,7 +188,7 @@ body {
 
 .led-pixel.rainbow {
     background: linear-gradient(45deg, #ff007f, #00f0ff);
-    box-shadow: 0 0 10px #00f0ff;
+    box-shadow: 0 0 12px #00f0ff;
 }
 
 /* Glass Card */
@@ -630,4 +713,40 @@ input:focus, select:focus {
 
 .hidden {
     display: none !important;
+}
+
+/* Toast Notification (Feedback immédiat non intrusif) */
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.94);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--neon-red);
+    color: #f8fafc;
+    padding: 10px 22px;
+    border-radius: 10px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.4);
+    z-index: 1000;
+    pointer-events: none;
+    animation: toastSlideDown 0.3s ease-out;
+}
+
+.toast-notification.success {
+    border-color: var(--neon-green);
+    box-shadow: 0 0 24px rgba(16, 185, 129, 0.4);
+}
+
+.toast-notification.info {
+    border-color: var(--neon-blue);
+    box-shadow: 0 0 24px rgba(0, 240, 255, 0.4);
+}
+
+@keyframes toastSlideDown {
+    from { opacity: 0; transform: translate(-50%, -15px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
 }

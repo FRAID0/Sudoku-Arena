@@ -14,10 +14,15 @@
         <!-- Bandeau LED Virtuel IoT (WS2812b NeoPixel) -->
         <header class="iot-led-station">
             <div class="led-bar-label">
-                <span class="pulse-dot"></span>
-                <span>IOT VIRTUAL LED MATRIX — WS2812B</span>
+                <div class="iot-title-left">
+                    <span class="pulse-dot" id="networkDot"></span>
+                    <span>IOT VIRTUAL LED MATRIX — WS2812B</span>
+                </div>
+                <div class="network-badge online" id="networkBadge">
+                    <span id="networkStatusText">🟢 EN LIGNE</span>
+                </div>
             </div>
-            <div class="led-strip" id="ledStrip">
+            <div class="led-strip" id="ledStrip" role="region" aria-label="Bandeau LED de statut de jeu">
                 <!-- 30 pixels LED générés par JS -->
             </div>
         </header>
@@ -49,6 +54,14 @@
                         </select>
                     </div>
                     <div class="select-group">
+                        <label for="validationMode">Règle de Validation :</label>
+                        <select id="validationMode">
+                            <option value="simple" selected>✨ Mode Simple (Règles locales)</option>
+                            <option value="strict">🧩 Mode Casse-Tête (Solution unique)</option>
+                        </select>
+                        <span class="helper-text" id="validationHelp">✨ Chiffres valides selon les règles Sudoku sans bloquer sur la solution finale</span>
+                    </div>
+                    <div class="select-group">
                         <label for="gameDifficulty">Difficulté :</label>
                         <select id="gameDifficulty">
                             <option value="easy">Facile (Chrono 30s)</option>
@@ -72,6 +85,14 @@
                 <div class="action-box ai-box">
                     <h3>Duel vs KI FRAID (Bot)</h3>
                     <p>Affrontez l'IA en Tour par Tour avec chronomètre et vol de points.</p>
+                    <div class="select-group">
+                        <label for="aiValidationMode">Règle de Validation :</label>
+                        <select id="aiValidationMode">
+                            <option value="simple" selected>✨ Mode Simple (Règles locales)</option>
+                            <option value="strict">🧩 Mode Casse-Tête (Solution unique)</option>
+                        </select>
+                        <span class="helper-text" id="aiValidationHelp">✨ Chiffres valides selon les règles Sudoku sans bloquer sur la solution finale</span>
+                    </div>
                     <div class="select-group">
                         <label for="aiDifficulty">Niveau de KI FRAID :</label>
                         <select id="aiDifficulty">
@@ -180,7 +201,8 @@
                     <button id="btnBackLobby" class="btn btn-secondary">Retour au Lobby</button>
                 </div>
             </div>
-        </div>
+        <!-- Toast de Notification (Feedbacks rejets / alertes) -->
+        <div id="toastNotification" class="toast-notification hidden"></div>
     </div>
 
     <script src="js/app.js"></script>

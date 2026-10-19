@@ -5,6 +5,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.core.room_manager import RoomManager, RoomState, GameMode
+from app.core.sudoku import SudokuEngine
 
 
 class TestRoomManagerClash(unittest.TestCase):
@@ -21,7 +22,7 @@ class TestRoomManagerClash(unittest.TestCase):
         self.assertIsNotNone(room.shared_grid)
 
     def test_turn_alternation_on_mistake(self):
-        room = self.manager.create_room("p1_id", "Alice", GameMode.CLASH, "hard")
+        room = self.manager.create_room("p1_id", "Alice", GameMode.CLASH, "hard", validation_mode="strict")
         code = room.room_code
         self.manager.join_room(code, "p2_id", "Bob")
         self.manager.start_game(code)
@@ -96,6 +97,36 @@ class TestRoomManagerClash(unittest.TestCase):
         self.assertEqual(res["score"], 4.0)
         self.assertEqual(res["current_turn"], "p2_id")
         self.assertEqual(room.current_turn_player_id, "p2_id")
+
+    def test_dual_validation_mode(self):
+        # 1. Mode Simple : accepte tout placement valide localement
+        room_simple = self.manager.create_room("p1", "Alice", GameMode.CLASH, "medium", validation_mode="simple")
+        code_s = room_simple.room_code
+        self.manager.start_game(code_s)
+        empty_r, empty_c = SudokuEngine.find_empty_cell(room_simple.shared_grid)
+        
+        # Trouver un chiffre valide pour les règles locales (ligne/colonne/carré)
+        valid_local = None
+        for n in range(1, 10):
+            if SudokuEngine.is_valid_placement(room_simple.shared_grid, empty_r, empty_c, n):
+                valid_local = n
+                break
+        self.assertIsNotNone(valid_local)
+        res_s = self.manager.play_move(code_s, "p1", empty_r, empty_c, valid_local)
+        self.assertTrue(res_s["valid"])
+        self.assertEqual(room_simple.shared_grid[empty_r][empty_c], valid_local)
+
+        # 2. Mode Strict : rejette si ce n'est pas la solution unique finale
+        room_strict = self.manager.create_room("p2", "Bob", GameMode.CLASH, "medium", validation_mode="strict")
+        code_st = room_strict.room_code
+        self.manager.start_game(code_st)
+        empty_r2, empty_c2 = SudokuEngine.find_empty_cell(room_strict.shared_grid)
+        correct_sol = room_strict.solution[empty_r2][empty_c2]
+        wrong_sol = (correct_sol % 9) + 1
+        
+        res_st = self.manager.play_move(code_st, "p2", empty_r2, empty_c2, wrong_sol)
+        self.assertFalse(res_st["valid"])
+        self.assertIn("reason", res_st)
 
 
 if __name__ == "__main__":

@@ -62,10 +62,11 @@ class Player:
 
 
 class Room:
-    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium"):
+    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple"):
         self.room_code = room_code
         self.mode = mode
         self.difficulty = difficulty.lower() if difficulty.lower() in POINTS else "medium"
+        self.validation_mode = validation_mode.lower() if validation_mode.lower() in ("simple", "strict") else "simple"
         self.state = RoomState.WAITING
         self.created_at = time.time()
         self.start_time: Optional[float] = None
@@ -142,10 +143,10 @@ class RoomManager:
                 return code
         raise RuntimeError("Impossible de générer un code de salon unique")
 
-    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium") -> Room:
+    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple") -> Room:
         code = self._generate_unique_code()
         host = Player(player_id=host_id, name=host_name, is_host=True)
-        room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty)
+        room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty, validation_mode=validation_mode)
 
         # Générer le puzzle
         puzzle, solution = SudokuEngine.generate_puzzle(difficulty)
@@ -198,6 +199,7 @@ class RoomManager:
     def play_move(self, room_code: str, player_id: str, row: int, col: int, value: int) -> Dict:
         """
         Valide et applique un coup soumis par un joueur avec arbitrage du tour et du score.
+        Supporte deux modes : 'simple' (règles locales) et 'strict' (solution finale unique).
         """
         room = self.rooms.get(room_code)
         if not room:
@@ -208,6 +210,15 @@ class RoomManager:
         player = room.players.get(player_id)
         if not player:
             raise ValueError("Joueur non autorisé dans ce salon.")
+
+        # Sécurisation des types et bornes
+        try:
+            row, col, value = int(row), int(col), int(value)
+        except (ValueError, TypeError):
+            return {"valid": False, "rejected": True, "reason": "Coordonnées ou valeur non numériques."}
+
+        if not (0 <= row < 9 and 0 <= col < 9 and 1 <= value <= 9):
+            return {"valid": False, "rejected": True, "reason": "Coordonnées (0-8) ou chiffre (1-9) hors limites."}
 
         # En mode Clash ou Solo AI : vérifier impérativement si c'est son tour
         if room.mode in (GameMode.CLASH, GameMode.SOLO_AI):
@@ -226,7 +237,16 @@ class RoomManager:
             return {"valid": False, "rejected": True, "reason": "Cette case est déjà remplie."}
 
         time_taken = time.time() - (room.turn_start_time or time.time())
-        is_valid = SudokuEngine.validate_move(room.solution, row, col, value)
+
+        # Validation selon le mode choisi :
+        # - Mode 'strict' (Casse-Tête) : doit correspondre à la solution finale unique
+        # - Mode 'simple' (Règles locales) : doit respecter la ligne, la colonne et le bloc 3x3 actuel
+        if room.validation_mode == "strict":
+            is_valid = SudokuEngine.validate_move(room.solution, row, col, value)
+            error_reason = "Chiffre incorrect (ne correspond pas à la solution finale du casse-tête)."
+        else:
+            is_valid = SudokuEngine.is_valid_placement(target_grid, row, col, value)
+            error_reason = "Conflit : ce chiffre est déjà présent sur la même ligne, colonne ou bloc 3x3 !"
 
         if is_valid:
             target_grid[row][col] = value
@@ -281,7 +301,8 @@ class RoomManager:
                 "mistakes": player.mistakes,
                 "current_turn": next_player,
                 "turn_switched": True,
-                "game_over": False
+                "game_over": False,
+                "reason": error_reason
             }
 
     def timeout_turn(self, room_code: str) -> Optional[Dict]:

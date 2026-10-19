@@ -62,8 +62,9 @@ async def startup_event():
 class CreateRoomRequest(BaseModel):
     host_id: str
     host_name: str
-    mode: str = "race"
+    mode: str = "clash"
     difficulty: str = "medium"
+    validation_mode: str = "simple" # "simple" (règles locales) ou "strict" (solution finale unique)
 
 
 class ConnectionManager:
@@ -219,12 +220,14 @@ async def create_room(req: CreateRoomRequest):
         host_id=req.host_id,
         host_name=req.host_name,
         mode=mode,
-        difficulty=req.difficulty
+        difficulty=req.difficulty,
+        validation_mode=req.validation_mode
     )
     return {
         "room_code": room.room_code,
         "mode": room.mode.value,
         "difficulty": room.difficulty,
+        "validation_mode": room.validation_mode,
         "initial_puzzle": room.initial_puzzle
     }
 

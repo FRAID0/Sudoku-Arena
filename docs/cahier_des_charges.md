@@ -146,3 +146,59 @@ graph TD
 | **M4** | **Docker & Intégration MQTT** | `Dockerfile`, `docker-compose.yml` (Backend + Frontend + Mosquitto), tests d'intégration locaux. |
 | **M5** | **Kubernetes, CI/CD & Production** | Manifestes K8s multi-replicas, test de résilience aux pannes de Pods, workflow GitHub Actions CI. |
 | **M6** | **Monétisation & Métriques** | Tableau de bord de rétention, intégration optionnelle thèmes Premium. |
+
+---
+
+## 6. 🎯 Retours Terrain & Spécifications de Raffinement V2
+
+### 6.1 Ergonomie & Affichage « Zéro-Scroll » (Single-Screen Viewport)
+* **Contrainte d'affichage stricte** : Le jeu entier (Bandeau LED, Header, Scoreboards, Grille 9x9 et Pavé numérique) doit obligatoirement tenir dans un écran sans aucun défilement vertical (`100dvh` / `overflow: hidden`).
+* **Justification Joueur** : En scrollant, le joueur perd de vue la jauge de l'adversaire, le chronomètre néon et les retours lumineux du bandeau LED.
+
+### 6.2 Refonte du Simulateur de Bandeau LED (WS2812b virtuel)
+* **Vitesse & Douceur** : Remplacer les impulsions ultrarapides par des transitions douces et progressives (fade-in / fade-out de 400 à 600ms) perceptibles à l'œil nu.
+* **Témoin de Prise de Main (Indicateur de Tour)** :
+  - Joueur 1 actif : Balayage ou halo bleu néon orienté vers la gauche (côté Joueur 1).
+  - Joueur 2 / Bot KI actif : Balayage ou halo violet/bleu orienté vers la droite (côté Joueur 2).
+* **Feedback de Validation** :
+  - Vert doux pulsé sur coup correct.
+  - Rouge doux avec onde de recul sur erreur ou fin de chrono.
+
+### 6.3 Les 2 Modes de Validation de Chiffre
+1. **Mode "Casse-Tête" (Strict / Solution Unique)** :
+   - Vérification autoritaire par rapport à la grille résolue finale secrète (`solution[row][col] == value`).
+   - Idéal pour les puristes et les tournois ELO.
+2. **Mode "Simple / Sans Prise de Tête" (Règles Locales)** :
+   - Vérifie uniquement que le chiffre respecte les contraintes locales immédiates : pas de doublon sur la ligne, la colonne et le bloc 3x3 actuel (`is_valid_placement(current_grid, row, col, value)`).
+   - Accepte le coup même s'il peut mener à une impasse plus tard.
+   - Évite la frustration du joueur débutant qui place un chiffre logiquement possible mais rejeté par le serveur.
+
+### 6.4 Analyse de Charge & Surcharge (Scalability & Haute Disponibilité)
+* **Sur Northflank Free (Conteneur Unique)** :
+  - 1 seule instance (0.1 vCPU, 256 Mo RAM).
+  - En cas de pic à 1 000 salons simultanés : saturation CPU, dépassement de mémoire (OOM-Kill) et déconnexion des WebSockets.
+* **Sur Architecture Kubernetes Complète (Notre cible K8s)** :
+  - Déploiement multi-répliques (3+ Pods) avec `HPA` (Horizontal Pod Autoscaler).
+  - Le `Service` / `Ingress LoadBalancer` répartit les connexions WebSockets équitablement.
+  - Résilience garantie en production sans aucun crash serveur.
+
+### 6.5 Stratégie de Déploiement Hybride & Démonstration LinkedIn / Portfolio
+Afin de concilier démonstration publique immédiate (accessible par les recruteurs en 1 clic) et maîtrise poussée de Kubernetes sans payer d'hébergement cloud :
+
+1. **Environnement A — Jeu Accessible Publiquement (Cloud Managé 100% Gratuit) :**
+   - **Frontend :** Vercel Edge (`https://sudoku-arena-frontend.vercel.app`) avec build statique HTML/CSS/JS.
+   - **Backend :** Northflank Developer Sandbox (`https://p01--sudoku-backend--hvzj8dcpgjs4.code.run`) avec conteneur FastAPI & WebSockets toujours actif (0.1 vCPU / 256MB).
+   - **Bénéfice :** Permet à quiconque d'ouvrir deux onglets ou deux smartphones pour jouer en direct.
+
+2. **Environnement B — Laboratoire Kubernetes Local (Démonstration DevOps / SRE) :**
+   - **Cluster :** Docker Desktop avec `kind` (6 pods : 3 réplicas backend, 2 réplicas frontend, 1 broker Mosquitto).
+   - **Validation :** Liveness/Readiness probes, self-healing lors d'un pod crash (<2s), manifests K8s et pipeline CI/CD GitHub Actions (`.github/workflows/ci.yml`).
+   - **Formulation Portfolio :** *"Projet Full-Stack & DevOps : Déploiement live sur Vercel + Northflank. Pipeline CI/CD GitHub Actions et laboratoire d'orchestration Kubernetes local (manifests multi-réplicas, probes de santé, tests de résilience)."*
+
+3. **Améliorations Ergonomiques & Frontend Validées :**
+   - Toast d'alerte explicite affichant la raison du rejet renvoyée par le serveur.
+   - Protection de l'état UI : scores et jauges de progression insensibles aux coups invalides ou rejetés.
+   - Robustesse WebSocket avec badge d'état réseau et tentatives de reconnexion automatique.
+   - Accessibilité complète au clavier (flèches directionnelles 3x3 + 1-9) et ergonomie tactile optimisée.
+
+
