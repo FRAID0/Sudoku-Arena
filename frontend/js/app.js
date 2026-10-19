@@ -31,6 +31,13 @@ function playBeep(frequency = 440, duration = 0.15) {
     }
 }
 
+// Détection dynamique de l'URL du Backend :
+// - En local (localhost / 127.0.0.1) : utilise le proxy local / Nginx
+// - En production (Vercel, etc.) : utilise le cluster Northflank en HTTPS/WSS
+const IS_LOCAL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const BACKEND_HOST = IS_LOCAL ? window.location.host : "p01--sudoku-backend--hvzj8dcpgjs4.code.run";
+const API_BASE_URL = IS_LOCAL ? "" : `https://${BACKEND_HOST}`;
+
 // État de l'application
 const state = {
     playerId: "player_" + Math.random().toString(36).substring(2, 9),
@@ -294,9 +301,8 @@ function updateTurnUI(currentTurnPlayerId, timeoutSeconds) {
 
 // Connexion WebSocket
 function connectWebSocket(roomCode, onOpenCallback = null) {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
-    const wsUrl = `${protocol}//${host}/ws/${roomCode}/${state.playerId}/${encodeURIComponent(state.playerName)}`;
+    const protocol = (window.location.protocol === "https:" || !IS_LOCAL) ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${BACKEND_HOST}/ws/${roomCode}/${state.playerId}/${encodeURIComponent(state.playerName)}`;
 
     state.socket = new WebSocket(wsUrl);
 
@@ -445,7 +451,7 @@ dom.btnCreateRoom.addEventListener("click", async () => {
     state.difficulty = difficulty;
 
     try {
-        const res = await fetch("/api/rooms", {
+        const res = await fetch(`${API_BASE_URL}/api/rooms`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -501,7 +507,7 @@ dom.btnPlayAi.addEventListener("click", async () => {
     state.difficulty = chosenDiff;
 
     try {
-        const res = await fetch("/api/rooms", {
+        const res = await fetch(`${API_BASE_URL}/api/rooms`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
