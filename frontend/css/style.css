@@ -523,24 +523,19 @@ input:focus, select:focus {
     animation: shake 0.35s ease-in-out;
 }
 .arena-board-wrapper {
-    display: grid;
-    grid-template-columns: auto 240px;
+    display: flex;
     justify-content: center;
-    align-items: start;
-    gap: 12px;
-}
-
-@media (max-width: 768px) {
-    .arena-board-wrapper {
-        grid-template-columns: 1fr;
-    }
+    align-items: flex-start;
+    gap: 16px;
+    width: 100%;
 }
 
 .sudoku-board-container {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 6px;
+    padding: 10px;
+    flex-shrink: 0;
 }
 
 .sudoku-grid {
@@ -548,13 +543,14 @@ input:focus, select:focus {
     grid-template-columns: repeat(9, 1fr);
     grid-template-rows: repeat(9, 1fr);
     gap: 2px;
-    width: min(100%, 390px, calc(100dvh - 210px));
-    height: min(100%, 390px, calc(100dvh - 210px));
+    width: min(430px, calc(100dvh - 210px), 62vw);
+    height: min(430px, calc(100dvh - 210px), 62vw);
     aspect-ratio: 1 / 1;
     background: #1e293b;
     border: 3px solid var(--neon-blue);
     border-radius: 8px;
     padding: 2px;
+    box-shadow: 0 0 18px rgba(0, 240, 255, 0.2);
 }
 
 .cell {
@@ -562,11 +558,12 @@ input:focus, select:focus {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: clamp(0.95rem, 2.3vh, 1.35rem);
+    font-size: clamp(1rem, 2.6vh, 1.45rem);
     font-weight: 700;
     cursor: pointer;
     user-select: none;
-    transition: background 0.15s;
+    transition: background 0.15s, color 0.15s;
+    aspect-ratio: 1 / 1;
 }
 
 .cell:hover {
@@ -611,6 +608,16 @@ input:focus, select:focus {
     100% { transform: scale(1); }
 }
 
+.controls-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    width: 240px;
+    flex-shrink: 0;
+}
+
 .controls-container.disabled-turn {
     opacity: 0.55;
     pointer-events: none;
@@ -642,15 +649,6 @@ input:focus, select:focus {
 }
 
 /* Pavé Tactile */
-.controls-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 10px;
-    max-width: 250px;
-}
-
 .numpad-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -661,8 +659,8 @@ input:focus, select:focus {
     background: rgba(15, 23, 42, 0.9);
     border: 1px solid rgba(56, 189, 248, 0.25);
     border-radius: 6px;
-    padding: 8px 0;
-    font-size: 1.25rem;
+    padding: 10px 0;
+    font-size: 1.3rem;
     font-weight: 800;
     color: white;
     cursor: pointer;
@@ -683,6 +681,69 @@ input:focus, select:focus {
 
 #btnStartGame {
     grid-column: span 2;
+}
+
+/* Responsive Tablette & Mobile (<= 768px) */
+@media (max-width: 768px) {
+    .arena-board-wrapper {
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .sudoku-board-container {
+        padding: 6px;
+        width: 100%;
+        max-width: 370px;
+    }
+
+    .sudoku-grid {
+        width: min(350px, calc(100dvh - 290px), 94vw);
+        height: min(350px, calc(100dvh - 290px), 94vw);
+    }
+
+    .controls-container {
+        width: 100%;
+        max-width: 370px;
+        padding: 8px;
+        gap: 6px;
+    }
+
+    .numpad-grid {
+        grid-template-columns: repeat(9, 1fr);
+        gap: 4px;
+    }
+
+    .numpad-btn {
+        padding: 10px 0;
+        font-size: 1.15rem;
+    }
+}
+
+/* Responsive Petit Mobile (<= 480px) */
+@media (max-width: 480px) {
+    .match-bar {
+        padding: 6px 10px;
+        gap: 6px;
+    }
+
+    .room-badge {
+        font-size: 0.8rem;
+    }
+
+    .players-progress-container {
+        min-width: 100%;
+        gap: 8px;
+    }
+
+    .player-info {
+        font-size: 0.75rem;
+    }
+
+    .numpad-btn {
+        padding: 8px 0;
+        font-size: 1rem;
+    }
 }
 
 /* Modals */
