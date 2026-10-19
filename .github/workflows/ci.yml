@@ -66,7 +66,7 @@ jobs:
           push: false
 
   # -------------------------------------------------------------
-  # JOB 3 : Validation de la Syntaxe des Manifestes Kubernetes
+  # JOB 3 : Validation de la Syntaxe et Schémas Kubernetes
   # -------------------------------------------------------------
   validate-k8s:
     name: ☸️ Validate Kubernetes Manifests
@@ -76,8 +76,20 @@ jobs:
       - name: 📥 Récupérer le code source
         uses: actions/checkout@v4
 
-      - name: 🔍 Vérifier la syntaxe des manifests YAML avec kubectl
+      - name: 🔍 Vérifier la syntaxe YAML des manifests
         run: |
-          # Valide la structure de tous les fichiers .yaml du dossier k8s en mode client offline
-          kubectl apply --dry-run=client --validate=false -f k8s/
+          python3 -c "
+          import yaml, glob
+          for f in sorted(glob.glob('k8s/*.yaml')):
+              with open(f) as s:
+                  docs = list(yaml.safe_load_all(s))
+                  print(f'✅ {f} : {len(docs)} document(s) YAML valide(s)')
+          "
+
+      - name: ☸️ Valider la conformité des schémas Kubernetes (Kubeconform)
+        uses: docker://ghcr.io/yannh/kubeconform:latest
+        with:
+          entrypoint: '/kubeconform'
+          args: "-summary -schema-location default k8s/"
+
 
