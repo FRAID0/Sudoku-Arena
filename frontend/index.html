@@ -49,7 +49,7 @@
                     <div class="select-group">
                         <label for="gameMode">Mode de Jeu :</label>
                         <select id="gameMode">
-                            <option value="clash" selected>⚡ Clash (Tour par Tour — Ta Signature)</option>
+                            <option value="clash" selected>⚡ Clash (Tour par Tour)</option>
                             <option value="race">🏎️ Course (Speedrun Miroir)</option>
                         </select>
                     </div>
@@ -73,26 +73,27 @@
                 </div>
 
                 <!-- Rejoindre un salon -->
-                <div class="action-box">
-                    <h3>Rejoindre par Code</h3>
+                <div class="action-box join-box">
+                    <div>
+                        <h3>Rejoindre par Code</h3>
+                        <p class="action-desc">Entrez le code à 4 lettres d'un ami pour rejoindre son arène multijoueur en direct.</p>
+                    </div>
                     <div class="input-inline">
-                        <input type="text" id="joinCodeInput" placeholder="CODE (ex: K9AF)" maxlength="4">
+                        <input type="text" id="joinCodeInput" placeholder="CODE (EX: K9AF)" maxlength="4">
                         <button id="btnJoinRoom" class="btn btn-secondary">Rejoindre ⚔️</button>
                     </div>
                 </div>
 
                 <!-- Mode Solo vs KI FRAID -->
                 <div class="action-box ai-box">
-                    <div class="ai-card-top">
-                        <div class="ai-avatar-container">
-                            <img src="assets/ki-fraid.jpg" alt="KI FRAID - Cyberpunk Sudoku AI" class="ai-avatar-thumb">
-                        </div>
-                        <div class="ai-meta">
-                            <h3>Duel vs KI FRAID</h3>
+                    <div class="ai-hero-card">
+                        <img src="assets/ki-fraid.jpg" alt="KI FRAID - Cyberpunk Sudoku AI" class="ai-hero-img">
+                        <div class="ai-hero-overlay">
                             <span class="ai-status-pill">⚡ BOT CYBERNÉTIQUE</span>
+                            <h3 class="ai-hero-title">Duel vs KI FRAID</h3>
+                            <p class="ai-hero-desc">Affrontez l'IA autonome. Elle s'adapte automatiquement à votre difficulté et règle.</p>
                         </div>
                     </div>
-                    <p class="ai-brief">Affrontez l'IA autonome en duel tour par tour. Elle s'adapte automatiquement à la difficulté et aux règles choisies.</p>
                     <button id="btnPlayAi" class="btn btn-ai">Défier KI FRAID 🤖</button>
                 </div>
             </div>
