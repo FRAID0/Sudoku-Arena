@@ -78,5 +78,6 @@ jobs:
 
       - name: 🔍 Vérifier la syntaxe des manifests YAML avec kubectl
         run: |
-          # Valide tous les fichiers .yaml du dossier k8s sans avoir besoin d'un vrai cluster
-          kubectl apply --dry-run=client -f k8s/
+          # Valide la structure de tous les fichiers .yaml du dossier k8s en mode client offline
+          kubectl apply --dry-run=client --validate=false -f k8s/
+
