@@ -1,4 +1,4 @@
-﻿# Byte-compiled / optimized / DLL files
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -19,3 +19,8 @@ mosquitto/log/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Test reports & CI artifacts
+reports/
+.jenkins_venv/
+test-results.xml

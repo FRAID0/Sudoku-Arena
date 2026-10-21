@@ -1,0 +1,27 @@
+services:
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    image: sudoku-arena-jenkins:latest
+    container_name: sudoku-arena-jenkins
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+      - "50000:50000"
+    environment:
+      - JENKINS_OPTS=--httpPort=8080
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=true -Duser.timezone=Europe/Paris
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - sudoku-jenkins-net
+
+volumes:
+  jenkins_data:
+    name: sudoku_arena_jenkins_data
+
+networks:
+  sudoku-jenkins-net:
+    name: sudoku-arena-jenkins-net
