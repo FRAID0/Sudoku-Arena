@@ -63,38 +63,39 @@ graph TD
 
 ## 4. 🧭 Feuille de Route en 4 Phases Opérationnelles
 
-### 📅 PHASE 1 : Pipeline GitHub Actions (La Base de Confiance)
+### 📅 PHASE 1 : Pipeline GitHub Actions (La Base de Confiance) — ✅ TERMINÉE
 *Objectif : Zéro code non testé ou vulnérable ne rentre sur `main`.*
 
 1. **Workflow de Validation PR (`.github/workflows/ci.yml`)** :
    - Déclenchement sur chaque `pull_request` ciblant `main`.
    - Setup Python 3.12 avec cache pip.
-   - Exécution des 17 tests `pytest` et linting (`flake8` / `black`).
+   - Exécution des 20 tests `pytest` et validation YAML / Kubeconform.
    - Permissions minimales `contents: read` sur `GITHUB_TOKEN`.
 2. **Workflow de Release & Publication Image (`.github/workflows/release.yml`)** :
    - Déclenchement sur `push: branches: [main]` et sur tags `v*.*.*`.
    - Authentification sécurisée sur `ghcr.io` via `${{ secrets.GITHUB_TOKEN }}`.
-   - Build des images `backend` et `frontend` avec `docker/build-push-action` épinglée à des versions immuables.
+   - Build des images `backend` et `frontend` avec `docker/build-push-action`.
    - Tagging automatique : `sha-${{ github.sha }}`, `latest` et version sémantique.
    - Scan de vulnérabilités avec **Trivy** (alerte sur failles `HIGH` et `CRITICAL`).
 
 ---
 
-### 📅 PHASE 2 : Pipeline Jenkins Déclaratif (L'Atout Grand Compte)
+### 📅 PHASE 2 : Pipeline Jenkins Déclaratif (L'Atout Grand Compte) — ✅ TERMINÉE
 *Objectif : Déployer et maîtriser un serveur CI Jenkins conteneurisé "As-Code".*
 
 1. **Serveur Jenkins Local (`docker-compose.jenkins.yml`)** :
-   - Image officielle `jenkins/jenkins:lts-jdk17`.
+   - Image officielle `jenkins/jenkins:lts-jdk17` enrichie (`jenkins/Dockerfile`).
    - Montage du socket Docker hôte : `-v /var/run/docker.sock:/var/run/docker.sock` pour construire les images sans overhead DinD.
    - Volume persistant pour la configuration : `-v jenkins_data:/var/jenkins_home`.
+   - Plugins pré-installés via `plugins.txt` (`workflow-aggregator`, `docker-workflow`, `junit`, `pipeline-stage-view`, etc.).
 2. **`Jenkinsfile` Déclaratif à la Racine** :
-   - Stages : *Checkout*, *Lint*, *Unit Tests & JUnit Report (`reports/test-results.xml`)*, *Docker Build*, *Security Scan*.
-   - Gestion sécurisée des identifiants via le **Jenkins Credentials Store** (zéro secret en dur).
+   - Stages : *Diagnostics*, *Lint & K8s*, *Unit Tests & JUnit Report (`reports/test-results.xml`)*, *Docker Build*, *Security Scan (Trivy)*.
    - Graphiques de tests JUnit intégrés directement dans l'interface de build Jenkins.
+   - Guide pas-à-pas disponible dans [`docs/jenkins_setup.md`](jenkins_setup.md).
 
 ---
 
-### 📅 PHASE 3 : Conteneurisation Distribuée, Redis & Kubernetes (Helm)
+### 📅 PHASE 3 : Conteneurisation Distribuée, Redis & Kubernetes (Helm) — 🎯 PROCHAINE ÉTAPE
 *Objectif : Rendre le backend 100% sans état (Stateless) pour scaler horizontalement.*
 
 1. **Découplage de l'état avec Redis** :
@@ -127,15 +128,10 @@ graph TD
 ## 5. 🛡️ Bonnes Pratiques de Sécurité & Robustesse
 
 * **Sécurité de la chaîne logistique logicielle** :
-  - Actions GitHub épinglées par SHA commit ou versions majeures vérifiées.
-  - Scan continu des images Docker avec Trivy.
+  - Actions GitHub épinglées par versions majeures vérifiées.
+  - Scan continu des images Docker avec Trivy dans GitHub Actions et Jenkins.
   - Dépendances Python auditées (`pip-audit`).
 * **Résilience IoT / MQTT** :
   - La télémétrie LED MQTT tourne en tâche de fond découplée ; une coupure de Mosquitto ne bloque **jamais** la validation d'un coup de Sudoku.
 * **Propreté du Dépôt Git** :
   - Zéro secret dans Git (`.env.example` versionné, secrets injectés via CI).
-
----
-
-## 🏁 Prochaine Action dès votre signal :
-Dès que vous me donnez le **« GO »**, nous démarrons immédiatement par **l'Étape 1 : Création du workflow GitHub Actions CI (`.github/workflows/ci.yml`)** avec exécution des tests et linting automatique ! 🚀
