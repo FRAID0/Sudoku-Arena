@@ -20,6 +20,12 @@ class GameMode(str, Enum):
     SOLO_AI = "solo_ai"   # Solo contre KI FRAID
 
 
+class ClashRule(str, Enum):
+    STRICT = "strict"              # Option A : Alternance stricte (1 coup par tour)
+    COMBO_CAPPED = "combo_capped"  # Option C : Combo limité (max 2 coups consécutifs, défaut recommandé)
+    UNLIMITED = "unlimited"        # Option B : Série illimitée (tant qu'on valide, on garde la main)
+
+
 class RoomState(str, Enum):
     WAITING = "waiting"       # En attente d'un adversaire
     STARTING = "starting"     # Décompte 3.. 2.. 1..
@@ -88,11 +94,19 @@ class Player:
 
 
 class Room:
-    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple"):
+    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED):
         self.room_code = room_code
         self.mode = mode
         self.difficulty = difficulty.lower() if difficulty.lower() in POINTS else "medium"
         self.validation_mode = validation_mode.lower() if validation_mode.lower() in ("simple", "strict") else "simple"
+        if isinstance(clash_rule, ClashRule):
+            self.clash_rule = clash_rule
+        else:
+            try:
+                self.clash_rule = ClashRule(str(clash_rule).lower())
+            except ValueError:
+                self.clash_rule = ClashRule.COMBO_CAPPED
+        self.current_combo_streak: int = 0
         self.state = RoomState.WAITING
         self.created_at = time.time()
         self.start_time: Optional[float] = None
@@ -118,6 +132,8 @@ class Room:
             "mode": self.mode.value if isinstance(self.mode, GameMode) else str(self.mode),
             "difficulty": self.difficulty,
             "validation_mode": self.validation_mode,
+            "clash_rule": self.clash_rule.value if isinstance(self.clash_rule, ClashRule) else str(self.clash_rule),
+            "current_combo_streak": self.current_combo_streak,
             "state": self.state.value if isinstance(self.state, RoomState) else str(self.state),
             "created_at": self.created_at,
             "start_time": self.start_time,
@@ -152,13 +168,21 @@ class Room:
         except ValueError:
             mode = GameMode.CLASH
 
+        clash_rule_val = data.get("clash_rule", ClashRule.COMBO_CAPPED)
+        try:
+            clash_rule = ClashRule(clash_rule_val)
+        except ValueError:
+            clash_rule = ClashRule.COMBO_CAPPED
+
         room = cls(
             room_code=data["room_code"],
             host=host_p,
             mode=mode,
             difficulty=data.get("difficulty", "medium"),
-            validation_mode=data.get("validation_mode", "simple")
+            validation_mode=data.get("validation_mode", "simple"),
+            clash_rule=clash_rule
         )
+        room.current_combo_streak = int(data.get("current_combo_streak", 0))
         state_val = data.get("state", "waiting")
         try:
             room.state = RoomState(state_val)
@@ -201,12 +225,13 @@ class Room:
         return round((filled / empty_initial) * 100.0, 1)
 
     def switch_turn(self) -> str:
-        """Passe la main au joueur suivant et réinitialise le chrono de tour."""
+        """Passe la main au joueur suivant et réinitialise le chrono et la série de combo."""
         players = self.player_list
         if len(players) >= 2:
             current_idx = next((i for i, p in enumerate(players) if p.player_id == self.current_turn_player_id), 0)
             next_idx = (current_idx + 1) % len(players)
             self.current_turn_player_id = players[next_idx].player_id
+        self.current_combo_streak = 0
         self.turn_start_time = time.time()
         return self.current_turn_player_id
 
@@ -236,10 +261,10 @@ class RoomManager:
                 return code
         raise RuntimeError("Impossible de générer un code de salon unique")
 
-    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple") -> Room:
+    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED) -> Room:
         code = self._generate_unique_code()
         host = Player(player_id=host_id, name=host_name, is_host=True)
-        room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty, validation_mode=validation_mode)
+        room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty, validation_mode=validation_mode, clash_rule=clash_rule)
 
         # Générer le puzzle
         puzzle, solution = SudokuEngine.generate_puzzle(difficulty)
@@ -285,6 +310,7 @@ class RoomManager:
         room.state = RoomState.IN_GAME
         room.start_time = time.time()
         room.turn_start_time = time.time()
+        room.current_combo_streak = 0
         # Le premier joueur actif est l'hôte
         room.current_turn_player_id = room.player_list[0].player_id
         return room
@@ -292,7 +318,10 @@ class RoomManager:
     def play_move(self, room_code: str, player_id: str, row: int, col: int, value: int) -> Dict:
         """
         Valide et applique un coup soumis par un joueur avec arbitrage du tour et du score.
-        Supporte deux modes : 'simple' (règles locales) et 'strict' (solution finale unique).
+        Supporte deux modes de validation ('simple' et 'strict') et 3 variantes de tour Clash :
+        - STRICT : 1 coup par tour obligatoire (alternance stricte)
+        - COMBO_CAPPED : max 2 coups consécutifs par joueur si valide (recommandé par défaut)
+        - UNLIMITED : le joueur garde la main tant qu'il réussit ses coups
         """
         room = self.rooms.get(room_code)
         if not room:
@@ -348,8 +377,37 @@ class RoomManager:
             player.score += points_gained
             player.progress = room.calculate_progress(target_grid)
 
-            # En mode Clash/Solo AI, chaque coup joué passe la main pour un vrai duel interactif tour par tour
-            next_player = room.switch_turn() if room.mode in (GameMode.CLASH, GameMode.SOLO_AI) else room.current_turn_player_id
+            # Gestion de l'alternance et des combos selon la variante Clash choisie :
+            if room.mode in (GameMode.CLASH, GameMode.SOLO_AI):
+                room.current_combo_streak += 1
+                streak_recorded = room.current_combo_streak
+                if room.clash_rule == ClashRule.STRICT:
+                    # Option A : Alternance stricte systématique (1 coup par tour)
+                    next_player = room.switch_turn()
+                    turn_switched = True
+                    is_combo = False
+                elif room.clash_rule == ClashRule.UNLIMITED:
+                    # Option B : Série illimitée (tant qu'on valide, on garde la main)
+                    next_player = room.current_turn_player_id
+                    room.turn_start_time = time.time()
+                    turn_switched = False
+                    is_combo = (streak_recorded > 1)
+                else:
+                    # Option C (Défaut : COMBO_CAPPED) : Max 2 coups consécutifs
+                    if streak_recorded < 2:
+                        next_player = room.current_turn_player_id
+                        room.turn_start_time = time.time()
+                        turn_switched = False
+                        is_combo = True
+                    else:
+                        next_player = room.switch_turn()
+                        turn_switched = True
+                        is_combo = False
+            else:
+                streak_recorded = 0
+                next_player = room.current_turn_player_id
+                turn_switched = False
+                is_combo = False
 
             # Vérifier si la grille est totalement complétée
             is_completed = (player.progress >= 100.0) or all(cell != 0 for r in target_grid for cell in r)
@@ -373,15 +431,19 @@ class RoomManager:
                 "bonus_gained": bonus_pts,
                 "progress": player.progress,
                 "current_turn": next_player,
-                "turn_switched": (room.mode in (GameMode.CLASH, GameMode.SOLO_AI)),
+                "turn_switched": turn_switched,
+                "combo_streak": streak_recorded,
+                "is_combo": is_combo,
+                "clash_rule": room.clash_rule.value,
                 "shared_grid": target_grid,
                 "game_over": room.state == RoomState.FINISHED,
                 "winner_id": room.winner_id
             }
         else:
-            # ERREUR : pénalité de 1 point et PASSAGE DE TOUR IMMÉDIAT
+            # ERREUR : pénalité de 1 point, bris de combo et passage de tour immédiat
             player.mistakes += 1
             player.score = max(0.0, player.score - 1.0)
+            room.current_combo_streak = 0
             next_player = room.switch_turn() if room.mode in (GameMode.CLASH, GameMode.SOLO_AI) else room.current_turn_player_id
 
             return {
@@ -393,7 +455,10 @@ class RoomManager:
                 "score": player.score,
                 "mistakes": player.mistakes,
                 "current_turn": next_player,
-                "turn_switched": True,
+                "turn_switched": (room.mode in (GameMode.CLASH, GameMode.SOLO_AI)),
+                "combo_streak": 0,
+                "is_combo": False,
+                "clash_rule": room.clash_rule.value,
                 "game_over": False,
                 "reason": error_reason
             }
@@ -409,12 +474,15 @@ class RoomManager:
             current_player.score = max(0.0, current_player.score - 1.0)
             current_player.mistakes += 1
 
+        room.current_combo_streak = 0
         next_player = room.switch_turn()
         return {
             "timeout": True,
             "timed_out_player_id": current_player.player_id if current_player else None,
             "score": current_player.score if current_player else 0.0,
-            "current_turn": next_player
+            "current_turn": next_player,
+            "combo_streak": 0,
+            "turn_switched": True
         }
 
     def leave_room(self, room_code: str, player_id: str) -> Optional[Dict]:

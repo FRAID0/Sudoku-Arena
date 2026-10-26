@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import paho.mqtt.client as mqtt
 
-from app.core.room_manager import RoomManager, GameMode, RoomState
+from app.core.room_manager import RoomManager, GameMode, RoomState, ClashRule
 from app.core.redis_manager import RedisManager
 from app.core.metrics import (
     setup_metrics,
@@ -233,6 +233,7 @@ class CreateRoomRequest(BaseModel):
     mode: str = "clash"
     difficulty: str = "medium"
     validation_mode: str = "simple"  # "simple" (règles locales) ou "strict" (solution finale unique)
+    clash_rule: str = "combo_capped"  # "strict", "combo_capped" (défaut), ou "unlimited"
 
 
 @app.get("/health")
@@ -253,12 +254,18 @@ async def create_room(req: CreateRoomRequest):
     except ValueError:
         mode = GameMode.RACE
 
+    try:
+        clash_rule = ClashRule(req.clash_rule.lower())
+    except (ValueError, AttributeError):
+        clash_rule = ClashRule.COMBO_CAPPED
+
     room = room_manager.create_room(
         host_id=req.host_id,
         host_name=req.host_name,
         mode=mode,
         difficulty=req.difficulty,
-        validation_mode=req.validation_mode
+        validation_mode=req.validation_mode,
+        clash_rule=clash_rule
     )
     ACTIVE_ROOMS.set(len(room_manager.rooms))
 
@@ -270,6 +277,7 @@ async def create_room(req: CreateRoomRequest):
         "mode": room.mode.value,
         "difficulty": room.difficulty,
         "validation_mode": room.validation_mode,
+        "clash_rule": room.clash_rule.value,
         "initial_puzzle": room.initial_puzzle
     }
 
@@ -290,6 +298,8 @@ async def get_room(room_code: str):
         "state": room.state.value,
         "mode": room.mode.value,
         "difficulty": room.difficulty,
+        "validation_mode": room.validation_mode,
+        "clash_rule": room.clash_rule.value,
         "players": [
             {
                 "id": p.player_id,
