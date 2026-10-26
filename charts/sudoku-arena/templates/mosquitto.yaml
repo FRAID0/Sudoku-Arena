@@ -1,0 +1,56 @@
+{{- if .Values.mosquitto.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sudoku-arena.fullname" . }}-mosquitto
+  labels:
+    {{- include "sudoku-arena.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mosquitto
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "sudoku-arena.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mosquitto
+  template:
+    metadata:
+      labels:
+        {{- include "sudoku-arena.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mosquitto
+    spec:
+      containers:
+        - name: mosquitto
+          image: "{{ .Values.mosquitto.image.repository }}:{{ .Values.mosquitto.image.tag }}"
+          imagePullPolicy: {{ .Values.mosquitto.image.pullPolicy }}
+          ports:
+            - name: mqtt-tcp
+              containerPort: {{ .Values.mosquitto.service.tcpPort }}
+              protocol: TCP
+            - name: mqtt-ws
+              containerPort: {{ .Values.mosquitto.service.wsPort }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.mosquitto.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sudoku-arena.fullname" . }}-mosquitto
+  labels:
+    {{- include "sudoku-arena.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mosquitto
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.mosquitto.service.tcpPort }}
+      targetPort: mqtt-tcp
+      protocol: TCP
+      name: mqtt-tcp
+    - port: {{ .Values.mosquitto.service.wsPort }}
+      targetPort: mqtt-ws
+      protocol: TCP
+      name: mqtt-ws
+  selector:
+    {{- include "sudoku-arena.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mosquitto
+{{- end }}

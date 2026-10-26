@@ -1,0 +1,19 @@
+🎉 Félicitations ! Sudoku Arena a été déployé avec succès sur Kubernetes via Helm.
+
+1. 🔍 Vérifier l'état des Pods :
+   kubectl get pods -l "app.kubernetes.io/instance={{ .Release.Name }}" -o wide
+
+2. 🚀 Accéder à l'application :
+{{- if .Values.ingress.enabled }}
+   Ajoutez l'entrée suivante dans votre fichier hosts (/etc/hosts ou C:\Windows\System32\drivers\etc\hosts) :
+   127.0.0.1  {{ (index .Values.ingress.hosts 0).host }}
+
+   Puis ouvrez votre navigateur :
+   http://{{ (index .Values.ingress.hosts 0).host }}
+{{- else }}
+   kubectl port-forward svc/{{ include "sudoku-arena.fullname" . }}-frontend 8080:80
+   http://localhost:8080
+{{- end }}
+
+3. 📊 État de santé du Backend :
+   curl http://localhost:8000/health (via port-forward svc/{{ include "sudoku-arena.fullname" . }}-backend 8000:8000)
