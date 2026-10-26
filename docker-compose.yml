@@ -13,6 +13,22 @@ services:
     networks:
       - sudoku_network
 
+  redis:
+    image: redis:7-alpine
+    container_name: sudoku_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - sudoku_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -24,8 +40,11 @@ services:
     environment:
       - MQTT_BROKER=mosquitto
       - MQTT_PORT=1883
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       - mosquitto
+      - redis
     networks:
       - sudoku_network
 
@@ -49,3 +68,4 @@ networks:
 volumes:
   mosquitto_data:
   mosquitto_log:
+  redis_data:

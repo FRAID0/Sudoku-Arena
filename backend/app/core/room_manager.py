@@ -60,6 +60,32 @@ class Player:
         self.finished = False
         self.finish_time: Optional[float] = None
 
+    def to_dict(self) -> dict:
+        return {
+            "player_id": self.player_id,
+            "name": self.name,
+            "is_host": self.is_host,
+            "is_connected": self.is_connected,
+            "grid": self.grid,
+            "score": self.score,
+            "mistakes": self.mistakes,
+            "progress": self.progress,
+            "finished": self.finished,
+            "finish_time": self.finish_time
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Player":
+        p = cls(player_id=data["player_id"], name=data["name"], is_host=data.get("is_host", False))
+        p.is_connected = data.get("is_connected", True)
+        p.grid = data.get("grid")
+        p.score = float(data.get("score", 0.0))
+        p.mistakes = int(data.get("mistakes", 0))
+        p.progress = float(data.get("progress", 0.0))
+        p.finished = data.get("finished", False)
+        p.finish_time = data.get("finish_time")
+        return p
+
 
 class Room:
     def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple"):
@@ -85,6 +111,73 @@ class Room:
         self.initial_puzzle: Optional[Grid] = None
         self.solution: Optional[Grid] = None
         self.shared_grid: Optional[Grid] = None
+
+    def to_dict(self) -> dict:
+        return {
+            "room_code": self.room_code,
+            "mode": self.mode.value if isinstance(self.mode, GameMode) else str(self.mode),
+            "difficulty": self.difficulty,
+            "validation_mode": self.validation_mode,
+            "state": self.state.value if isinstance(self.state, RoomState) else str(self.state),
+            "created_at": self.created_at,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
+            "players": {pid: p.to_dict() for pid, p in self.players.items()},
+            "spectators": self.spectators,
+            "winner_id": self.winner_id,
+            "current_turn_player_id": self.current_turn_player_id,
+            "turn_start_time": self.turn_start_time,
+            "turn_timeout": self.turn_timeout,
+            "initial_puzzle": self.initial_puzzle,
+            "solution": self.solution,
+            "shared_grid": self.shared_grid
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Room":
+        players_data = data.get("players", {})
+        host_p = None
+        for p_dict in players_data.values():
+            if p_dict.get("is_host"):
+                host_p = Player.from_dict(p_dict)
+                break
+        if not host_p and players_data:
+            host_p = Player.from_dict(next(iter(players_data.values())))
+        if not host_p:
+            host_p = Player(player_id="unknown_host", name="Host", is_host=True)
+
+        mode_val = data.get("mode", "clash")
+        try:
+            mode = GameMode(mode_val)
+        except ValueError:
+            mode = GameMode.CLASH
+
+        room = cls(
+            room_code=data["room_code"],
+            host=host_p,
+            mode=mode,
+            difficulty=data.get("difficulty", "medium"),
+            validation_mode=data.get("validation_mode", "simple")
+        )
+        state_val = data.get("state", "waiting")
+        try:
+            room.state = RoomState(state_val)
+        except ValueError:
+            room.state = RoomState.WAITING
+
+        room.created_at = data.get("created_at", time.time())
+        room.start_time = data.get("start_time")
+        room.end_time = data.get("end_time")
+        room.players = {pid: Player.from_dict(p_dict) for pid, p_dict in players_data.items()}
+        room.spectators = data.get("spectators", [])
+        room.winner_id = data.get("winner_id")
+        room.current_turn_player_id = data.get("current_turn_player_id")
+        room.turn_start_time = data.get("turn_start_time")
+        room.turn_timeout = float(data.get("turn_timeout", 20.0))
+        room.initial_puzzle = data.get("initial_puzzle")
+        room.solution = data.get("solution")
+        room.shared_grid = data.get("shared_grid")
+        return room
 
     @property
     def player_list(self) -> List[Player]:
