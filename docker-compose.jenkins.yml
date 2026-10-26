@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     image: sudoku-arena-jenkins:latest
     container_name: sudoku-arena-jenkins
+    user: root
     restart: unless-stopped
     ports:
       - "8085:8080"
