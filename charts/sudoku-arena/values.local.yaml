@@ -1,0 +1,16 @@
+# Surcharges locales pour déploiement sur Docker Desktop K8s / Kind
+# Utilise les images locales déjà construites sans interroger un registre externe.
+
+backend:
+  replicaCount: 2
+  image:
+    repository: sudoku-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: sudoku-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
