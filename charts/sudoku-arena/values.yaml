@@ -1,0 +1,107 @@
+# Default values for sudoku-arena.
+# Paramétrage global et spécifique pour chaque composant Cloud-Native.
+
+global:
+  environment: production
+
+# --- Backend Service (FastAPI + WebSockets) ---
+backend:
+  replicaCount: 3
+  image:
+    repository: ghcr.io/fraid0/sudoku-arena/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 64Mi
+  probes:
+    liveness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    readiness:
+      initialDelaySeconds: 3
+      periodSeconds: 5
+
+# --- Frontend Service (Nginx / Vanilla JS) ---
+frontend:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/fraid0/sudoku-arena/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 32Mi
+
+# --- Redis (Distributed State & Pub/Sub) ---
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: 7-alpine
+    pullPolicy: IfNotPresent
+  service:
+    port: 6379
+  resources:
+    limits:
+      cpu: 300m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 32Mi
+
+# --- Mosquitto (MQTT Telemetry Broker) ---
+mosquitto:
+  enabled: true
+  image:
+    repository: eclipse-mosquitto
+    tag: "2"
+    pullPolicy: IfNotPresent
+  service:
+    tcpPort: 1883
+    wsPort: 9001
+  resources:
+    limits:
+      cpu: 200m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 32Mi
+
+# --- Ingress Controller (Unified HTTP & WebSocket Gateway) ---
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/websocket-services: "backend"
+  hosts:
+    - host: sudoku.local
+      paths:
+        - path: /api
+          pathType: Prefix
+          service: backend
+        - path: /ws
+          pathType: Prefix
+          service: backend
+        - path: /health
+          pathType: Prefix
+          service: backend
+        - path: /
+          pathType: Prefix
+          service: frontend

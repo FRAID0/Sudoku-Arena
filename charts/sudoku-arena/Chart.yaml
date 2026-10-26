@@ -1,0 +1,15 @@
+apiVersion: v2
+name: sudoku-arena
+description: Helm Chart pour Sudoku Arena - Plateforme multijoueur temps réel et IA Cloud-Native
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - sudoku
+  - fastapi
+  - websockets
+  - redis
+  - mqtt
+maintainers:
+  - name: FRAID
+    email: inf4159@hs-worms.de
