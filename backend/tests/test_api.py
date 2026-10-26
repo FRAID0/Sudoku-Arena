@@ -57,6 +57,18 @@ class TestFastAPIEndpoints(unittest.TestCase):
         self.assertEqual(data["difficulty"], "medium")
         self.assertIn("room_code", data)
 
+    def test_prometheus_metrics(self):
+        response = self.client.get("/metrics")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/plain", response.headers.get("content-type", ""))
+        content = response.text
+        self.assertIn("sudoku_active_rooms", content)
+        self.assertIn("sudoku_games_started_total", content)
+        self.assertIn("sudoku_moves_total", content)
+        self.assertIn("sudoku_wins_total", content)
+
+
 
 if __name__ == "__main__":
     unittest.main()
+
