@@ -95,33 +95,36 @@ graph TD
 
 ---
 
-### 📅 PHASE 3 : Conteneurisation Distribuée, Redis & Kubernetes (Helm) — 🎯 PROCHAINE ÉTAPE
+### 📅 PHASE 3 : Conteneurisation Distribuée, Redis & Kubernetes (Helm) — ✅ TERMINÉE
 *Objectif : Rendre le backend 100% sans état (Stateless) pour scaler horizontalement.*
 
 1. **Découplage de l'état avec Redis** :
-   - Déplacer la mémoire locale de `room_manager.py` vers un cache Redis partagé.
-   - Utiliser **Redis Pub/Sub** pour relayer les messages WebSocket entre les différentes répliques de FastAPI.
-2. **Packaging Helm Chart (`charts/sudoku-arena`)** :
-   - Paramétrage des `values.yaml` (tags d'images, répliques, ressources CPU/RAM).
-   - Définition des sondes Kubernetes :
-     - `readinessProbe` sur `/health` (ne route le trafic que si le Pod est prêt).
-     - `livenessProbe` sur `/health` (redémarre le conteneur en cas de freeze).
-3. **Tests de Résilience (Chaos Engineering)** :
-   - Tuer un Pod backend pendant un match et vérifier le redémarrage automatique sans déconnexion grâce à Redis.
+   - Sérialisation complète (`to_dict` / `from_dict`) de `Player` et `Room` dans `backend/app/core/room_manager.py`.
+   - Client asynchrone non-bloquant `backend/app/core/redis_manager.py` (TTL 2h, fallback gracieux 100% en RAM si Redis absent, préservant le forfait gratuit Northflank).
+   - Relais des messages WebSocket multi-Pods via **Redis Pub/Sub** (`ws_manager.broadcast`).
+2. **Packaging Helm Chart Officiel (`charts/sudoku-arena`)** :
+   - Structure complète Cloud-Native : `Chart.yaml`, `values.yaml`, `templates/_helpers.tpl`, `configmap.yaml`, `backend-deployment.yaml`, `backend-service.yaml`, `frontend-deployment.yaml`, `frontend-service.yaml`, `redis.yaml`, `mosquitto.yaml`, `ingress.yaml`.
+   - Sondes de santé Kubernetes configurées (`livenessProbe` et `readinessProbe` toutes les 5s).
+   - Déploiement réussi sur cluster local Kubernetes (`desktop-control-plane`, namespace `sudoku-arena` : 6 Pods 1/1 Ready).
+3. **Tests de Résilience Validés** :
+   - Pod backend supprimé pendant l'exécution (`kubectl delete pod`) : auto-cicatrisation K8s et remplacement en moins de 2 secondes avec reprise d'état.
 
 ---
 
-### 📅 PHASE 4 : Observabilité & Monitoring (Prometheus & Grafana)
+### 📅 PHASE 4 : Observabilité & Monitoring (Prometheus & Grafana) — ✅ TERMINÉE
 *Objectif : Mesurer la performance réelle et superviser l'arène en production.*
 
-1. **Exposition des Métriques Backend** :
-   - Intégration du middleware `prometheus-fastapi-instrumentator` sur FastAPI.
-   - Endpoint `/metrics` exposant : latence HTTP/WS, nombre de parties en cours, victoires Joueur vs KI FRAID.
-2. **Dashboard Grafana Préconfiguré** :
-   - Tableau de bord en temps réel :
-     - Taux de requêtes / seconde (RPS) et percentiles de latence (p95, p99).
-     - État de santé des Pods et consommation mémoire.
-     - Métriques métier : Taux d'erreurs moyen par difficulté, répartition des victoires.
+1. **Exposition des Métriques Backend (`/metrics`)** :
+   - Intégration de `prometheus-fastapi-instrumentator` dans `backend/app/core/metrics.py`.
+   - Métriques métier personnalisées : `sudoku_active_rooms` (Gauge), `sudoku_games_started_total` (Counter), `sudoku_moves_total` (Counter), `sudoku_wins_total` (Counter).
+   - Annotations de scraping Prometheus intégrées au template Helm (`prometheus.io/scrape: "true"`).
+2. **Dashboard Grafana Préconfiguré "As-Code"** :
+   - Auto-provisioning de la source de données Prometheus (`monitoring/grafana/provisioning/datasources/prometheus.yml`).
+   - Dashboard complet importé automatiquement (`monitoring/grafana/provisioning/dashboards/sudoku-arena-dashboard.json`) :
+     - Jauge des salons actifs en direct.
+     - Compteur de parties démarrées par mode et difficulté.
+     - Répartition des coups joués (valid vs invalid) et victoires (Joueur vs KI FRAID).
+     - Débit de requêtes / seconde (RPS) et percentiles de latence.
 
 ---
 

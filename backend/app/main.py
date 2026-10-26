@@ -15,6 +15,13 @@ import paho.mqtt.client as mqtt
 
 from app.core.room_manager import RoomManager, GameMode, RoomState
 from app.core.redis_manager import RedisManager
+from app.core.metrics import (
+    setup_metrics,
+    ACTIVE_ROOMS,
+    GAMES_STARTED_TOTAL,
+    MOVES_TOTAL,
+    WINS_TOTAL
+)
 from app.ai.bot import KIFraidBot
 
 app = FastAPI(
@@ -30,6 +37,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialisation de l'instrumentation Prometheus (/metrics)
+setup_metrics(app)
 
 room_manager = RoomManager()
 redis_manager = RedisManager()
@@ -195,6 +205,8 @@ async def start_game_flow(room_code: str):
         await asyncio.sleep(1)
 
     room = room_manager.start_game(room_code)
+    GAMES_STARTED_TOTAL.labels(mode=room.mode.value, difficulty=room.difficulty).inc()
+
     if redis_manager and redis_manager.is_connected:
         await redis_manager.save_room(room)
 
@@ -248,6 +260,8 @@ async def create_room(req: CreateRoomRequest):
         difficulty=req.difficulty,
         validation_mode=req.validation_mode
     )
+    ACTIVE_ROOMS.set(len(room_manager.rooms))
+
     if redis_manager and redis_manager.is_connected:
         await redis_manager.save_room(room)
 
@@ -331,6 +345,10 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
                 val = data.get("value")
 
                 res = room_manager.play_move(code, player_id, row, col, val)
+                if not res.get("rejected"):
+                    result_label = "valid" if res.get("valid") else "invalid"
+                    MOVES_TOTAL.labels(result=result_label, mode=room.mode.value).inc()
+
                 if redis_manager and redis_manager.is_connected and code in room_manager.rooms:
                     await redis_manager.save_room(room_manager.rooms[code])
 
@@ -345,6 +363,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
                     publish_mqtt("game/led", {"state": "red", "player": player_id})
 
                 if res.get("game_over"):
+                    winner_type = "bot" if res.get("winner_id") == "bot_ki_fraid" else "player"
+                    WINS_TOTAL.labels(winner_type=winner_type, mode=room.mode.value).inc()
                     publish_mqtt("game/led", {"state": "rainbow", "winner": res.get("winner_id")})
 
             elif action == "TIMEOUT_TURN":
@@ -352,6 +372,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
                 if room and room.mode in (GameMode.CLASH, GameMode.SOLO_AI) and room.current_turn_player_id == player_id:
                     timeout_res = room_manager.timeout_turn(code)
                     if timeout_res:
+                        MOVES_TOTAL.labels(result="timeout", mode=room.mode.value).inc()
+
                         if redis_manager and redis_manager.is_connected and code in room_manager.rooms:
                             await redis_manager.save_room(room_manager.rooms[code])
 
@@ -368,6 +390,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
     except WebSocketDisconnect:
         ws_manager.disconnect(code, websocket)
         res = room_manager.leave_room(code, player_id)
+        ACTIVE_ROOMS.set(len(room_manager.rooms))
+
         if redis_manager and redis_manager.is_connected:
             if res and res.get("room_deleted"):
                 await redis_manager.delete_room(code)
