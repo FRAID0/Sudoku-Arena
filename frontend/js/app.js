@@ -73,6 +73,10 @@ const dom = {
     validationMode: document.getElementById("validationMode"),
     validationHelp: document.getElementById("validationHelp"),
     difficultySelect: document.getElementById("gameDifficulty"),
+    clashRuleSelect: document.getElementById("clashRule"),
+    clashRuleGroup: document.getElementById("clashRuleGroup"),
+    btnToggleVoice: document.getElementById("btnToggleVoice"),
+    voiceIcon: document.getElementById("voiceIcon"),
     btnCreateRoom: document.getElementById("btnCreateRoom"),
     btnJoinRoom: document.getElementById("btnJoinRoom"),
     btnPlayAi: document.getElementById("btnPlayAi"),
@@ -269,12 +273,12 @@ function handleInput(number) {
     // Vérification du tour en mode Clash
     if ((state.mode === "clash" || state.mode === "solo_ai") && state.currentTurn && state.currentTurn !== state.playerId) {
         playBeep(180, 0.15);
-        showToast("⏳ Ce n'est pas votre tour !", "error");
+        showToast(window.i18n ? i18n.t("not_your_turn") : "⏳ Ce n'est pas votre tour !", "error");
         return;
     }
 
     if (!state.selectedCell) {
-        showToast("Sélectionnez d'abord une case vide !", "info");
+        showToast(window.i18n ? i18n.t("select_empty_cell") : "Sélectionnez d'abord une case vide !", "info");
         return;
     }
 
@@ -288,7 +292,7 @@ function handleInput(number) {
             value: number
         }));
     } else {
-        showToast("Connexion au serveur interrompue...", "error");
+        showToast(window.i18n ? i18n.t("server_disconnected") : "Connexion au serveur interrompue...", "error");
     }
 }
 
@@ -352,7 +356,7 @@ function updateTurnUI(currentTurnPlayerId, timeoutSeconds) {
 
     if (isMyTurn) {
         if (dom.turnLabel) {
-            dom.turnLabel.textContent = "⏳ À VOTRE TOUR !";
+            dom.turnLabel.textContent = window.i18n ? i18n.t("your_turn") : "⏳ À VOTRE TOUR !";
             dom.turnLabel.style.color = "var(--neon-blue)";
         }
         if (dom.turnCountdown) dom.turnCountdown.style.color = "var(--neon-blue)";
@@ -362,11 +366,12 @@ function updateTurnUI(currentTurnPlayerId, timeoutSeconds) {
         if (dom.controlsContainer) dom.controlsContainer.classList.remove("disabled-turn");
         playBeep(587.33, 0.12); // Ton de notification (Ré)
     } else {
-        const oppName = (state.isAiMatch ? "KI FRAID" : (dom.p2Name.textContent || "Adversaire")).replace(" (Moi)", "");
+        const botLabel = window.i18n ? i18n.t("bot_rival_name") : "KI FRAID (Bot Rival 🤖)";
+        const oppName = (state.isAiMatch ? botLabel : (dom.p2Name.textContent || "Adversaire")).replace(" (Moi)", "");
         if (dom.turnLabel) {
             dom.turnLabel.textContent = state.isAiMatch 
-                ? "🧠 KI FRAID ANALYSE LA GRILLE..." 
-                : `⏳ TOUR DE ${oppName.toUpperCase()}...`;
+                ? (window.i18n ? i18n.t("turn_ai_thinking") : "🧠 LE BOT RIVAL KI FRAID RÉFLÉCHIT...") 
+                : `${window.i18n ? i18n.t("opponent_turn_of") : "⏳ TOUR DE"} ${oppName.toUpperCase()}...`;
             dom.turnLabel.style.color = "var(--neon-purple)";
         }
         if (dom.turnCountdown) dom.turnCountdown.style.color = "var(--neon-purple)";
@@ -415,6 +420,8 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
             state.turnTimeout = msg.turn_timeout || 20.0;
             state.currentTurn = msg.current_turn;
 
+            if (window.caster) caster.comment("GAME_START");
+
             // Verrouiller la vue en 100dvh zéro-scroll
             if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
 
@@ -453,6 +460,12 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
                 triggerLedEffect("success");
                 if (res.player_id === state.playerId) {
                     playBeep(523.25, 0.12);
+                    if (res.is_combo) {
+                        showToast("⚡ COMBO x2 ! Coup Bonus !", "info");
+                        if (window.caster) caster.comment("COMBO_X2");
+                    }
+                } else if (res.is_combo) {
+                    if (window.caster) caster.comment("COMBO_X2");
                 }
             } else {
                 if (cellEl) {
@@ -461,6 +474,7 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
                 }
                 triggerLedEffect("error");
                 playBeep(220, 0.25);
+                if (window.caster) caster.comment("MOVE_INVALID");
                 if (res.player_id === state.playerId) {
                     const reason = res.reason || "Chiffre incorrect ou conflit !";
                     showToast(`❌ ${reason}`, "error");
@@ -492,12 +506,18 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
 
             if (res.game_over) {
                 stopTurnTimer();
-                showGameOver(res.winner_id === state.playerId, res.winner_id === "DRAW");
+                const isWinner = (res.winner_id === state.playerId);
+                showGameOver(isWinner, res.winner_id === "DRAW");
+                if (window.caster) {
+                    if (isWinner) caster.comment("VICTORY");
+                    else if (res.winner_id !== "DRAW") caster.comment("DEFEAT");
+                }
             }
         } else if (msg.event === "TURN_TIMEOUT") {
             const res = msg.result;
             triggerLedEffect("error");
             playBeep(196, 0.3);
+            if (window.caster) caster.comment("TIMEOUT");
 
             if (res.timed_out_player_id === state.playerId) {
                 dom.p1Score.textContent = `${res.score} pts`;
@@ -575,13 +595,15 @@ function showGameOver(isWinner, isDraw = false) {
     triggerLedEffect("victory");
 
     if (isDraw) {
-        dom.modalWinnerTitle.textContent = "ÉGALITÉ ! 🤝";
+        dom.modalWinnerTitle.textContent = window.i18n ? i18n.t("draw_title") : "ÉGALITÉ ! 🤝";
         dom.modalWinnerDesc.textContent = "Score parfaitement identique à l'issue de la grille !";
     } else {
-        dom.modalWinnerTitle.textContent = isWinner ? "VICTOIRE ! 🏆" : "DÉFAITE ! 💥";
+        dom.modalWinnerTitle.textContent = isWinner 
+            ? (window.i18n ? i18n.t("victory_title") : "VICTOIRE ! 🏆") 
+            : (window.i18n ? i18n.t("defeat_title") : "DÉFAITE ! 💥");
         dom.modalWinnerDesc.textContent = isWinner
-            ? "Félicitations, vous remportez le duel au sommet de l'arène !"
-            : "Votre adversaire s'impose sur cette manche.";
+            ? (window.i18n ? i18n.t("modal_winner_desc") : "Félicitations, vous remportez le duel au sommet de l'arène !")
+            : (window.i18n ? i18n.t("modal_loser_desc") : "Votre adversaire s'impose sur cette manche.");
     }
     dom.gameOverModal.classList.remove("hidden");
     playBeep(isWinner ? 880 : 180, 0.6);
@@ -607,6 +629,7 @@ dom.btnCreateRoom.addEventListener("click", async () => {
     const difficulty = dom.difficultySelect.value;
     const mode = dom.gameModeSelect ? dom.gameModeSelect.value : "clash";
     const validationMode = dom.validationMode ? dom.validationMode.value : "simple";
+    const clashRule = (dom.clashRuleSelect && mode === "clash") ? dom.clashRuleSelect.value : "combo_capped";
     state.mode = mode;
     state.difficulty = difficulty;
     state.validationMode = validationMode;
@@ -620,7 +643,8 @@ dom.btnCreateRoom.addEventListener("click", async () => {
                 host_name: state.playerName,
                 mode: mode,
                 difficulty: difficulty,
-                validation_mode: validationMode
+                validation_mode: validationMode,
+                clash_rule: clashRule
             })
         });
         const data = await res.json();
@@ -699,14 +723,18 @@ dom.btnPlayAi.addEventListener("click", async () => {
             dom.displayModeBadge.textContent = `🤖 KI FRAID (${diffName}) [${valName}]`;
         }
         dom.p1Name.textContent = state.playerName + " (Moi)";
-        dom.p2Name.textContent = `KI FRAID (${diffName}) 🤖`;
-        dom.matchStatusText.textContent = "Départ imminent...";
+        const botLabel = window.i18n ? i18n.t("bot_rival_name") : "KI FRAID (Bot Rival 🤖)";
+        dom.p2Name.textContent = `${botLabel} [${diffName}]`;
+        dom.matchStatusText.textContent = window.i18n ? i18n.t("game_starting") : "Départ imminent...";
 
         dom.lobbySection.classList.add("hidden");
         dom.gameSection.classList.remove("hidden");
         dom.btnStartGame.classList.add("hidden");
 
         buildBoardUI(data.initial_puzzle);
+
+        // Annonce du Caster présentant le duel contre le bot rival
+        if (window.caster) caster.comment("VS_BOT");
 
         // Connexion WebSocket et lancement automatique du décompte
         connectWebSocket(state.roomCode, () => {
@@ -782,4 +810,68 @@ window.addEventListener("keydown", (e) => {
 // Initialisation au chargement
 document.addEventListener("DOMContentLoaded", () => {
     initVirtualLedStrip();
+
+    // 1. Initialiser le système trilingue
+    if (window.i18n) {
+        window.i18n.updateDOM();
+        
+        // Mettre à jour l'état actif des boutons de langue
+        const currentLang = window.i18n.currentLang;
+        document.querySelectorAll(".lang-btn").forEach(btn => {
+            btn.classList.toggle("active", btn.dataset.lang === currentLang);
+            btn.addEventListener("click", () => {
+                const lang = btn.dataset.lang;
+                window.i18n.setLanguage(lang);
+                document.querySelectorAll(".lang-btn").forEach(b => b.classList.toggle("active", b === btn));
+                if (window.caster) caster.comment("WELCOME");
+            });
+        });
+    }
+
+        // Réagir aux changements de langue
+        window.addEventListener("languageChanged", () => {
+            updateValidationHelp(dom.validationMode, dom.validationHelp);
+            if (state.isAiMatch && dom.p2Name) {
+                const diffLabels = { easy: "NOVICE", medium: "TACTIQUE", hard: "GRAND MAÎTRE" };
+                const diffName = diffLabels[state.difficulty] || "TACTIQUE";
+                const botLabel = window.i18n ? i18n.t("bot_rival_name") : "KI FRAID (Bot Rival 🤖)";
+                dom.p2Name.textContent = `${botLabel} [${diffName}]`;
+            }
+            if (state.currentTurn) {
+                updateTurnUI(state.currentTurn, state.turnTimeout);
+            }
+            if (dom.btnToggleVoice && window.caster) {
+                dom.btnToggleVoice.title = caster.isVoiceEnabled 
+                    ? (window.i18n ? i18n.t("voice_on") : "Voix activée") 
+                    : (window.i18n ? i18n.t("voice_off") : "Voix coupée");
+            }
+        });
+
+    // 2. Initialiser le pupitre de KI FRAID Caster
+    if (dom.btnToggleVoice && window.caster) {
+        dom.btnToggleVoice.addEventListener("click", () => {
+            const active = caster.toggleVoice();
+            if (dom.voiceIcon) dom.voiceIcon.textContent = active ? "🔊" : "🔇";
+            dom.btnToggleVoice.title = active 
+                ? (window.i18n ? i18n.t("voice_on") : "Voix activée") 
+                : (window.i18n ? i18n.t("voice_off") : "Voix coupée");
+        });
+    }
+
+    // 3. Masquer/Afficher les règles de Clash selon le mode choisi
+    if (dom.gameModeSelect && dom.clashRuleGroup) {
+        dom.gameModeSelect.addEventListener("change", () => {
+            if (dom.gameModeSelect.value === "clash") {
+                dom.clashRuleGroup.classList.remove("hidden");
+            } else {
+                dom.clashRuleGroup.classList.add("hidden");
+            }
+        });
+    }
+
+    // 4. Salutation de bienvenue du Commentateur
+    setTimeout(() => {
+        if (window.caster) caster.comment("WELCOME");
+    }, 600);
 });
+
