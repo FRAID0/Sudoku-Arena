@@ -1,16 +1,47 @@
 /**
- * Module Commentateur Officiel — KI FRAID Caster 🎙️
- * Différencie explicitement l'arbitre/commentateur officiel (Caster) du bot rival en jeu (Bot KI FRAID).
- * Supporte le français, l'anglais et l'allemand avec un sac de tirage sans répétition (Shuffle Bag)
- * et la synthèse vocale Web Speech API native.
+ * Module Commentateur Officiel & Moteur Audio — KI FRAID Caster 🎙️
+ * 
+ * Intègre :
+ * 1. Voix HD Edge-TTS pré-générées (0 ms de latence, FR / EN / DE).
+ * 2. Effets Sonores Harmoniques doux (WAV feutrés sans bips stridents).
+ * 3. Intelligence Artificielle LLM (Google Gemini) pour Intros & Débriefings e-sport contextualisés.
+ * 4. Fallback transparent vers Web Speech API si réseau indisponible.
  */
 
 class KIFraidCaster {
     constructor() {
         this.isVoiceEnabled = localStorage.getItem("sudoku_arena_voice") !== "false";
-        this.lastPhrases = {}; // Mémorise la dernière phrase par événement pour éviter la répétition
+        this.isSfxEnabled = localStorage.getItem("sudoku_arena_sfx") !== "false";
+        this.voiceVolume = parseFloat(localStorage.getItem("sudoku_arena_voice_volume") || "0.85");
+        this.sfxVolume = parseFloat(localStorage.getItem("sudoku_arena_sfx_volume") || "0.65");
 
-        // Catalogue d'événements et de phrases en 3 langues (min 2 variantes par événement)
+        // Voix Edge-TTS par défaut selon la langue
+        this.defaultVoices = {
+            fr: "fr-FR-HenriNeural",
+            en: "en-US-GuyNeural",
+            de: "de-DE-FlorianMultilingualNeural"
+        };
+
+        this.preferredVoice = localStorage.getItem("sudoku_arena_preferred_voice") || null;
+        this.currentAudio = null;
+        this.lastPhrases = {};
+
+        // Préchargement des SFX doux
+        this.sfxAudio = {
+            valid: new Audio("/assets/audio/sfx/valid_chord.wav"),
+            combo: new Audio("/assets/audio/sfx/combo_burst.wav"),
+            error: new Audio("/assets/audio/sfx/error_soft.wav"),
+            click: new Audio("/assets/audio/sfx/click_soft.wav"),
+            victory: new Audio("/assets/audio/sfx/victory_chime.wav")
+        };
+
+        // Configuration volume initiale des SFX
+        Object.values(this.sfxAudio).forEach(a => {
+            a.volume = this.sfxVolume;
+            a.preload = "auto";
+        });
+
+        // Catalogue textuel de repli et de sous-titres HUD (3 langues)
         this.catalogue = {
             fr: {
                 WELCOME: [
@@ -18,137 +49,162 @@ class KIFraidCaster {
                     "Le public est en ébullition ! Choisis ton mode et que le meilleur gagne !"
                 ],
                 GAME_START: [
-                    "3.. 2.. 1.. C'est parti ! Que le spectacle commence !",
-                    "Début du duel ! Vitesse et rigueur seront les clés de la victoire !"
+                    "3.. 2.. 1.. C'est parti ! Que le spectacle commence !"
                 ],
                 MOVE_VALID: [
-                    "Bien joué ! Chiffre validé avec précision !",
-                    "Placement chirurgical ! Les points rentrent au compteur !"
+                    "Bien joué ! Chiffre validé avec précision !"
                 ],
                 COMBO_X2: [
-                    "⚡ OHHH ! COMBO x2 ! Deux coups d'affilée de toute beauté !",
-                    "⚡ Le coup bonus est rentré ! Quelle vista, la pression monte !"
+                    "⚡ COMBO x2 ! Deux coups d'affilée, quelle vista !"
                 ],
                 MOVE_INVALID: [
-                    "Aïe aïe aïe ! Erreur fatale, la main passe immédiatement !",
-                    "Chiffre refusé ! Cette faute coûte cher, l'adversaire reprend la main !"
+                    "Aïe aïe aïe ! Erreur fatale, la main passe immédiatement !"
                 ],
                 TIMEOUT: [
-                    "Trop tard ! Le chrono est tombé à zéro, tour perdu !",
-                    "Temps écoulé ! Hésitation fatale, la main change de camp !"
+                    "Temps écoulé ! Hésitation fatale, la main passe !"
                 ],
                 VICTORY: [
-                    "🏆 VICTOIRE ÉCLATANTE ! Quel duel d'anthologie !",
-                    "🏆 C'EST GAGNÉ ! L'arène a trouvé son véritable champion !"
+                    "🏆 VICTOIRE ÉCLATANTE ! L'arène a trouvé son champion !"
                 ],
                 DEFEAT: [
-                    "Fin du match ! La victoire s'échappe, mais une revanche s'impose !",
-                    "Défaite serrée ! Belle résistance dans l'arène, relance un duel !"
+                    "Fin du match ! Belle résistance dans l'arène, relance un duel !"
                 ],
-                REMATCH: [
-                    "C'est l'heure de la revanche ! Les compteurs sont remis à zéro !",
-                    "Deuxième round immédiat ! L'honneur est en jeu !"
+                MODE_CLASH: [
+                    "Mode Clash sélectionné : tour par tour stratégique avec bonus de combo !"
+                ],
+                MODE_RACE: [
+                    "Mode Course sélectionné : pur speedrun en miroir, que le plus rapide gagne !"
                 ],
                 VS_BOT: [
-                    "🎙️ Ici KI FRAID Caster au micro ! Vous affrontez le Bot Rival KI FRAID sur la grille ! Montrez-lui votre niveau !",
-                    "🎙️ Duel officiel lancé ! KI FRAID Caster aux commentaires, face au Bot Rival KI FRAID en jeu ! Donnez tout !"
+                    "Duel contre l'IA FRAID ! Montre à l'algorithme ce que l'esprit humain a dans le ventre !"
                 ]
             },
-
             en: {
                 WELCOME: [
-                    "Welcome to the Arena! Sharpen your mind, every move matters!",
-                    "The crowd is buzzing! Pick your mode and let the battle begin!"
+                    "Welcome to Sudoku Arena! Sharpen your mind, every move matters today!"
                 ],
                 GAME_START: [
-                    "3.. 2.. 1.. GO! Let the battle begin!",
-                    "Duel started! Speed and precision will decide the winner!"
+                    "3.. 2.. 1.. GO! Let the battle begin!"
                 ],
                 MOVE_VALID: [
-                    "Nicely done! Number locked in with great accuracy!",
-                    "Surgical placement! Points added to the scoreboard!"
+                    "Well played! Number locked in with precision!"
                 ],
                 COMBO_X2: [
-                    "⚡ OHHH! COMBO x2! Two consecutive hits, pure brilliance!",
-                    "⚡ Bonus move nailed! What incredible momentum!"
+                    "⚡ COMBO x2! Two consecutive hits, pure brilliance!"
                 ],
                 MOVE_INVALID: [
-                    "Ouch! Bad move, the turn switches immediately!",
-                    "Conflict detected! Costly mistake, opponent takes over!"
+                    "Ouch, invalid move! Costly mistake, opponent takes over!"
                 ],
                 TIMEOUT: [
-                    "Time's up! Clock hit zero, turn forfeit!",
-                    "Too late! Hesitation was fatal, opponent is on the move!"
+                    "Time is up! Fatal hesitation, turn lost!"
                 ],
                 VICTORY: [
-                    "🏆 GLORIOUS VICTORY! What an epic performance!",
-                    "🏆 IT'S OVER! We have a true Sudoku Champion!"
+                    "🏆 SPECTACULAR VICTORY! We have a true Sudoku Champion!"
                 ],
                 DEFEAT: [
-                    "Match concluded! A tough defeat, but a rematch awaits!",
-                    "Defeated on the wire! Great fight in the arena, run it back!"
+                    "Match over! Great effort in the arena, challenge for a rematch!"
                 ],
-                REMATCH: [
-                    "Rematch accepted! Slate is wiped clean, game on!",
-                    "Round two is live! Pride is on the line!"
+                MODE_CLASH: [
+                    "Clash Mode selected: turn-based strategy with combo multipliers!"
+                ],
+                MODE_RACE: [
+                    "Race Mode selected: pure mirror speedrun, first to finish wins!"
                 ],
                 VS_BOT: [
-                    "🎙️ KI FRAID Caster on the mic! You're facing Rival Bot KI FRAID on the grid! Show him what you've got!",
-                    "🎙️ Official duel is live! KI FRAID Caster calling the shots against Rival Bot KI FRAID! Give it your all!"
+                    "Duel against AI FRAID! Show the cybernetic bot what human intellect can do!"
                 ]
             },
-
             de: {
                 WELCOME: [
-                    "Willkommen in der Arena! Schärfe deinen Verstand, jeder Zug zählt!",
-                    "Das Publikum ist bereit! Wähle deinen Modus und möge der Beste gewinnen!"
+                    "Willkommen in der Sudoku Arena! Schärfe deinen Verstand, heute zählt jeder Zug!"
                 ],
                 GAME_START: [
-                    "3.. 2.. 1.. LOS! Möge das Duell beginnen!",
-                    "Spiel gestartet! Schnelligkeit und Präzision führen zum Sieg!"
+                    "3.. 2.. 1.. LOS! Möge das Duell beginnen!"
                 ],
                 MOVE_VALID: [
-                    "Starker Zug! Zahl mit höchster Präzision platziert!",
-                    "Chirurgischer Treffer! Punkte wandern auf das Konto!"
+                    "Gut gespielt! Zahl mit Präzision gesetzt!"
                 ],
                 COMBO_X2: [
-                    "⚡ OHHH! COMBO x2! Zwei Treffer in Folge, fantastisch!",
-                    "⚡ Der Bonuszug sitzt! Was für ein enormer Druck!"
+                    "⚡ COMBO x2! Zwei Treffer in Folge, meisterhaft!"
                 ],
                 MOVE_INVALID: [
-                    "Autsch! Ungültiger Zug, die Runde wechselt sofort!",
-                    "Konflikt erkannt! Teurer Fehler, der Gegner übernimmt das Ruder!"
+                    "Autsch! Ungültiger Zug, die Runde wechselt sofort!"
                 ],
                 TIMEOUT: [
-                    "Zu spät! Die Uhr ist abgelaufen, Zug verloren!",
-                    "Zeit ist um! Zögern bestraft, der Gegner ist am Zug!"
+                    "Zeit abgelaufen! Zu lange gezögert, der Zug ist verloren!"
                 ],
                 VICTORY: [
-                    "🏆 GLANZVOLLER SIEG! Was für ein Meisterstück in der Arena!",
-                    "🏆 GEWONNEN! Die Arena feiert ihren Champion!"
+                    "🏆 GLANZVOLLER SIEG! Die Arena feiert ihren Champion!"
                 ],
                 DEFEAT: [
-                    "Spiel vorbei! Eine knappe Niederlage, Zeit für eine Revanche!",
-                    "Starker Kampf, aber das Duell geht verloren. Auf zur Revanche!"
+                    "Spiel vorbei! Stark gekämpft, fordere eine Revanche!"
                 ],
-                REMATCH: [
-                    "Revanche angenommen! Alles auf null, Runde zwei startet!",
-                    "Sofortiges Rückspiel! Jetzt geht es um die Ehre!"
+                MODE_CLASH: [
+                    "Clash-Modus gewählt: rundenbasierte Strategie mit Combo-Multiplikator!"
+                ],
+                MODE_RACE: [
+                    "Renn-Modus gewählt: reines Spiegel-Speedrun, wer zuerst löst, gewinnt!"
                 ],
                 VS_BOT: [
-                    "🎙️ Hier ist KI FRAID Caster am Mikrofon! Du trittst gegen den Bot-Gegner KI FRAID an! Zeig ihm, was du kannst!",
-                    "🎙️ Das offizielle Duell läuft! KI FRAID Caster moderiert gegen den Bot-Gegner KI FRAID! Gib alles!"
+                    "Duell gegen KI FRAID! Zeige dem Algorithmus, was der menschliche Verstand leisten kann!"
                 ]
             }
         };
     }
 
     /**
-     * Choisit une phrase sans répéter la même immédiatement (Shuffle Bag)
+     * Récupère l'ID de voix Edge-TTS actif selon la langue
+     */
+    getActiveVoiceId(lang = "fr") {
+        try {
+            const saved = localStorage.getItem("sudoku_arena_preferred_voices");
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && parsed[lang]) return parsed[lang];
+            }
+        } catch (e) {}
+
+        if (this.preferredVoice) return this.preferredVoice;
+        return this.defaultVoices[lang] || this.defaultVoices.fr;
+    }
+
+    /**
+     * Joue un effet sonore doux (SFX) sans agressivité
+     */
+    playSfx(type) {
+        if (!this.isSfxEnabled) return;
+        const sound = this.sfxAudio[type] || this.sfxAudio.valid;
+        if (!sound) return;
+
+        try {
+            // Cloner le nœud audio pour permettre les sons superposés rapides sans coupure
+            const clone = sound.cloneNode();
+            clone.volume = this.sfxVolume;
+            clone.play().catch(() => {});
+        } catch (e) {
+            // Ignorer silencieusement si bloqué par autoplay
+        }
+    }
+
+    /**
+     * Remplace les anciens bips stridents par les SFX doux selon la fréquence
+     */
+    playSfxByFrequency(frequency) {
+        if (frequency <= 250) {
+            this.playSfx("error");
+        } else if (frequency >= 800) {
+            this.playSfx("combo");
+        } else {
+            this.playSfx("valid");
+        }
+    }
+
+    /**
+     * Choisit une phrase sans répétition immédiate
      */
     pickPhrase(eventKey, lang = "fr") {
         const langPack = this.catalogue[lang] || this.catalogue.fr;
-        const phrases = langPack[eventKey] || langPack.MOVE_VALID;
+        const phrases = langPack[eventKey] || langPack.WELCOME || [];
         if (!phrases || phrases.length === 0) return "";
 
         let available = phrases.filter(p => p !== this.lastPhrases[eventKey]);
@@ -160,19 +216,188 @@ class KIFraidCaster {
     }
 
     /**
-     * Fait réagir le commentateur (texte HUD + voix Web Speech API)
+     * Réaction vocale et textuelle du Commentateur officiel
      */
     comment(eventKey, context = {}) {
         const lang = (window.i18n && window.i18n.currentLang) || "fr";
-        const phrase = this.pickPhrase(eventKey, lang);
-        if (!phrase) return;
+        const phrase = context.text || this.pickPhrase(eventKey, lang);
 
-        // 1. Affichage dans la bulle HUD du Caster
+        // 1. Afficher dans la bulle HUD du Caster
         this.displayHud(phrase);
 
-        // 2. Synthèse Vocale (si activée)
+        // 2. Jouer la voix HD si activée
         if (this.isVoiceEnabled) {
-            this.speak(phrase, lang);
+            this.playVoice(eventKey, lang, phrase);
+        }
+    }
+
+    /**
+     * Stoppe immédiatement toute parole en cours (Audio HTML5 et WebSpeech API)
+     * Empêche strictement tout chevauchement ou double commentateur simultané.
+     */
+    stopAllVoice() {
+        if (this.currentAudio) {
+            try {
+                this.currentAudio.pause();
+                this.currentAudio.currentTime = 0;
+            } catch (e) {}
+            this.currentAudio = null;
+        }
+        if ("speechSynthesis" in window) {
+            try {
+                window.speechSynthesis.cancel();
+            } catch (e) {}
+        }
+        document.dispatchEvent(new CustomEvent("caster:speak:end"));
+    }
+
+    /**
+     * Joue l'échantillon HD Edge-TTS pré-généré (avec repli Web Speech API si manquant)
+     */
+    playVoice(eventKey, lang = "fr", fallbackText = "") {
+        // Arrêter strictement toute voix en cours
+        this.stopAllVoice();
+
+        const voiceId = this.getActiveVoiceId(lang);
+        const audioUrl = `/assets/audio/benchmark/${lang}/${voiceId}/${eventKey}.mp3`;
+
+        const audio = new Audio(audioUrl);
+        audio.volume = this.voiceVolume;
+        this.currentAudio = audio;
+
+        document.dispatchEvent(new CustomEvent("caster:speak:start"));
+
+        audio.onended = () => {
+            this.currentAudio = null;
+            document.dispatchEvent(new CustomEvent("caster:speak:end"));
+        };
+
+        audio.onerror = () => {
+            // Si le fichier MP3 n'est pas trouvé (ex: phrase dynamique LLM), repli vers Web Speech
+            this.currentAudio = null;
+            document.dispatchEvent(new CustomEvent("caster:speak:end"));
+            if (fallbackText) {
+                this.speakWebSpeech(fallbackText, lang);
+            }
+        };
+
+        audio.play().catch(() => {
+            // Bloqué par les politiques de navigateur ou fichier indisponible
+            if (fallbackText) {
+                this.speakWebSpeech(fallbackText, lang);
+            }
+        });
+    }
+
+    /**
+     * Appel à l'IA Gemini pour une annonce d'avant-match contextualisée
+     */
+    async commentIntro(ctx) {
+        const lang = ctx.lang || (window.i18n && window.i18n.currentLang) || "fr";
+        const payload = {
+            player1_name: ctx.player1 || "Joueur 1",
+            player2_name: ctx.player2 || null,
+            mode: ctx.mode || "clash",
+            clash_rule: ctx.clashRule || "combo_capped",
+            lang: lang
+        };
+
+        try {
+            const resp = await fetch("/api/commentator/intro", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                this.displayHud(data.text);
+
+                if (this.isVoiceEnabled) {
+                    if (data.source === "gemini") {
+                        // Phrase unique créée sur-mesure par l'IA : lue via synthèse vocale dynamique
+                        this.speakWebSpeech(data.text, lang);
+                    } else {
+                        // Repli procédural : joue le MP3 HD studio WELCOME
+                        this.playVoice("WELCOME", lang, data.text);
+                    }
+                }
+                return;
+            }
+        } catch (e) {
+            console.warn("Commentator LLM intro offline, using standard voice:", e);
+        }
+
+        // Repli par défaut
+        this.comment("WELCOME");
+    }
+
+    /**
+     * Appel à l'IA Gemini pour un débriefing e-sport d'après-match fondé sur les stats réelles
+     */
+    async commentDebrief(ctx) {
+        const lang = ctx.lang || (window.i18n && window.i18n.currentLang) || "fr";
+        const payload = {
+            winner_name: ctx.winner || "Champion",
+            loser_name: ctx.loser || null,
+            winner_score: ctx.winnerScore || 0,
+            loser_score: ctx.loserScore || 0,
+            is_draw: Boolean(ctx.isDraw),
+            total_combos: ctx.totalCombos || 0,
+            duration_seconds: ctx.duration || 0,
+            mode: ctx.mode || "clash",
+            lang: lang
+        };
+
+        try {
+            const resp = await fetch("/api/commentator/debrief", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                this.displayHud(data.text);
+
+                if (this.isVoiceEnabled) {
+                    if (data.source === "gemini") {
+                        this.speakWebSpeech(data.text, lang);
+                    } else {
+                        const clip = ctx.isWinner ? "VICTORY" : "DEFEAT";
+                        this.playVoice(clip, lang, data.text);
+                    }
+                }
+                return;
+            }
+        } catch (e) {
+            console.warn("Commentator LLM debrief offline, using standard voice:", e);
+        }
+
+        // Repli par défaut
+        this.comment(ctx.isWinner ? "VICTORY" : "DEFEAT");
+    }
+
+    /**
+     * Traite une intervention de commentateur e-sport en direct (diffusée par WebSocket)
+     */
+    handleLiveComment(comment) {
+        if (!comment || !comment.text) return;
+        const lang = comment.lang || (window.i18n && window.i18n.currentLang) || "fr";
+
+        // 1. Afficher dans la bulle HUD avec effet de pop
+        this.displayHud(comment.text);
+
+        // 2. Si la voix est activée, vocaliser avec le mood, débit (rate) et hauteur (pitch)
+        if (this.isVoiceEnabled) {
+            if (comment.source === "gemini") {
+                this.speakWebSpeech(comment.text, lang, {
+                    rate: comment.rate || 1.12,
+                    pitch: comment.pitch || 1.02
+                });
+            } else if (comment.audio_fallback_key) {
+                this.playVoice(comment.audio_fallback_key, lang, comment.text);
+            }
         }
     }
 
@@ -182,50 +407,66 @@ class KIFraidCaster {
         if (casterBubble && casterText) {
             casterText.textContent = text;
             casterBubble.classList.remove("pop-anim");
-            void casterBubble.offsetWidth; // Trigger reflow
+            void casterBubble.offsetWidth;
             casterBubble.classList.add("pop-anim");
             casterBubble.classList.remove("hidden");
         }
     }
 
-    speak(text, lang) {
+    speakWebSpeech(text, lang = "fr", opts = {}) {
         if (!("speechSynthesis" in window)) return;
+        this.stopAllVoice();
 
         try {
-            window.speechSynthesis.cancel(); // Arrêter la phrase précédente
             const utterance = new SpeechSynthesisUtterance(text);
-            
-            // Langue de synthèse
-            const langMap = {
-                fr: "fr-FR",
-                en: "en-US",
-                de: "de-DE"
-            };
+            const langMap = { fr: "fr-FR", en: "en-US", de: "de-DE" };
             utterance.lang = langMap[lang] || "fr-FR";
-            utterance.rate = 1.08; // Rythme dynamique d'animateur e-sport
-            utterance.pitch = 1.02;
+            utterance.rate = opts.rate || 1.06;
+            utterance.pitch = opts.pitch || 1.0;
 
-            // Sélectionner la meilleure voix disponible
+            utterance.onstart = () => {
+                document.dispatchEvent(new CustomEvent("caster:speak:start"));
+            };
+            utterance.onend = () => {
+                document.dispatchEvent(new CustomEvent("caster:speak:end"));
+            };
+            utterance.onerror = () => {
+                document.dispatchEvent(new CustomEvent("caster:speak:end"));
+            };
+
             const voices = window.speechSynthesis.getVoices();
-            const matchingVoice = voices.find(v => v.lang.startsWith(utterance.lang.slice(0, 2)));
-            if (matchingVoice) {
-                utterance.voice = matchingVoice;
-            }
+            const langPrefix = utterance.lang.slice(0, 2).toLowerCase();
+            const matching = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith(langPrefix));
+            // Privilégier les voix neurales / naturelles / online / google pour une diction ultra-réaliste
+            const premium = matching.find(v => /natural|neural|online|google/i.test(v.name));
+            utterance.voice = premium || matching[0] || null;
 
             window.speechSynthesis.speak(utterance);
         } catch (e) {
-            console.warn("SpeechSynthesis non disponible :", e);
+            console.warn("SpeechSynthesis error:", e);
         }
     }
 
     toggleVoice() {
         this.isVoiceEnabled = !this.isVoiceEnabled;
         localStorage.setItem("sudoku_arena_voice", this.isVoiceEnabled.toString());
-        if (!this.isVoiceEnabled && "speechSynthesis" in window) {
-            window.speechSynthesis.cancel();
+        if (!this.isVoiceEnabled) {
+            this.stopAllVoice();
         }
         return this.isVoiceEnabled;
     }
+
+    toggleSfx() {
+        this.isSfxEnabled = !this.isSfxEnabled;
+        localStorage.setItem("sudoku_arena_sfx", this.isSfxEnabled.toString());
+        return this.isSfxEnabled;
+    }
+
+    setPreferredVoice(voiceId) {
+        this.preferredVoice = voiceId;
+        localStorage.setItem("sudoku_arena_preferred_voice", voiceId);
+    }
 }
 
+// Instance globale singleton
 window.caster = new KIFraidCaster();

@@ -1,10 +1,15 @@
+@charset "UTF-8";
+
 :root {
-    --bg-dark: #080d1a;
-    --card-bg: rgba(16, 26, 48, 0.75);
+    --bg-dark: #070b14;
+    --card-bg: rgba(15, 23, 42, 0.78);
     --border-color: rgba(56, 189, 248, 0.25);
     --neon-blue: #00f0ff;
+    --neon-cyan: #00f0ff;
     --neon-purple: #a855f7;
+    --neon-pink: #f43f5e;
     --neon-green: #10b981;
+    --neon-amber: #f59e0b;
     --neon-red: #ef4444;
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
@@ -19,24 +24,55 @@
     padding: 0;
 }
 
+/* Background Canvas Cyber Mesh */
+#particleCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 0;
+    pointer-events: none;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    min-height: 100%;
+}
+
 body {
     background-color: var(--bg-dark);
     background-image: 
-        radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
-        radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.08) 0%, transparent 40%);
+        radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.09) 0%, transparent 45%),
+        radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.09) 0%, transparent 45%),
+        radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.8) 0%, transparent 100%);
     color: var(--text-primary);
     font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
     min-height: 100vh;
     min-height: 100dvh;
     overflow-x: hidden;
-    overflow-y: auto; /* Défilement de sécurité si écran très petit, mais layout ultra compact */
+    overflow-y: auto; /* Permet le défilement fluide dans le lobby */
     display: flex;
     justify-content: center;
-    align-items: center;
-    padding: 6px 12px;
+    align-items: flex-start;
+    padding: 6px 10px;
+}
+
+body.in-game,
+body:has(#gameSection:not(.hidden)),
+body:has(.arena-container.in-game) {
+    overflow: hidden !important;
+    padding: 2px 8px !important;
+    align-items: stretch !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
 }
 
 .arena-container {
+    position: relative;
+    z-index: 1;
     width: 100%;
     max-width: 960px;
     display: flex;
@@ -44,6 +80,16 @@ body {
     justify-content: flex-start;
     gap: 6px;
     margin: auto;
+    transition: filter 0.3s ease;
+}
+
+.arena-container.combo-flash {
+    animation: arenaComboFlash 0.5s ease-out;
+}
+
+@keyframes arenaComboFlash {
+    0% { filter: drop-shadow(0 0 30px rgba(0, 240, 255, 0.9)); }
+    100% { filter: none; }
 }
 
 /* En cours de partie, masquer le gros titre pour maximiser l'espace de la grille */
@@ -317,7 +363,9 @@ input:focus, select:focus {
 .ai-hero-card {
     position: relative;
     width: 100%;
-    height: 190px;
+    flex: 1;
+    min-height: 180px;
+    height: auto;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid rgba(168, 85, 247, 0.4);
@@ -625,16 +673,18 @@ input:focus, select:focus {
 .arena-board-wrapper {
     display: flex;
     justify-content: center;
-    align-items: flex-start;
-    gap: 16px;
+    align-items: center;
+    gap: 12px;
     width: 100%;
+    flex: 1;
+    min-height: 0;
 }
 
 .sudoku-board-container {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 10px;
+    padding: 2px;
     flex-shrink: 0;
 }
 
@@ -643,8 +693,8 @@ input:focus, select:focus {
     grid-template-columns: repeat(9, 1fr);
     grid-template-rows: repeat(9, 1fr);
     gap: 2px;
-    width: min(430px, calc(100dvh - 210px), 62vw);
-    height: min(430px, calc(100dvh - 210px), 62vw);
+    width: min(320px, calc(100dvh - 110px), 48vw);
+    height: min(320px, calc(100dvh - 110px), 48vw);
     aspect-ratio: 1 / 1;
     background: #1e293b;
     border: 3px solid var(--neon-blue);
@@ -712,9 +762,10 @@ input:focus, select:focus {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 10px;
-    padding: 12px 14px;
-    width: 240px;
+    gap: 4px;
+    padding: 3px 6px;
+    width: min(180px, 28vw);
+    max-height: min(320px, calc(100dvh - 110px));
     flex-shrink: 0;
 }
 
@@ -937,25 +988,415 @@ input:focus, select:focus {
 }
 
 /* In-Game Zero-Scroll Optimization */
-.arena-container.in-game {
-    max-height: 100dvh;
-    overflow: hidden;
-    padding: 6px 14px;
-    gap: 8px;
+body.in-game,
+body:has(.arena-container.in-game),
+body:has(#gameSection:not(.hidden)) {
+    overflow: hidden !important;
+    padding: 0 !important;
+    align-items: stretch !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
 }
 
-.arena-container.in-game .brand-header {
-    display: none;
+.arena-container.in-game,
+.arena-container:has(#gameSection:not(.hidden)) {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+    padding: 2px 8px !important;
+    gap: 3px !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
-.arena-container.in-game .match-bar {
-    padding: 8px 14px;
-    gap: 8px;
+.arena-container.in-game .brand-header,
+.arena-container:has(#gameSection:not(.hidden)) .brand-header {
+    display: none !important;
 }
 
-.arena-container.in-game .sudoku-grid {
-    width: min(420px, calc(100dvh - 175px), 58vw);
-    height: min(420px, calc(100dvh - 175px), 58vw);
+.arena-container.in-game .iot-led-station,
+.arena-container:has(#gameSection:not(.hidden)) .iot-led-station {
+    padding: 1px 6px !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.arena-container.in-game .led-bar-label,
+.arena-container:has(#gameSection:not(.hidden)) .led-bar-label {
+    display: none !important; /* Masque l'intitulé et le sélecteur de langue en plein match */
+}
+
+.arena-container.in-game .led-strip,
+.arena-container:has(#gameSection:not(.hidden)) .led-strip {
+    height: 4px !important;
+}
+
+.arena-container.in-game .caster-hud-card,
+.arena-container:has(#gameSection:not(.hidden)) .caster-hud-card {
+    padding: 2px 8px !important;
+    min-height: 22px !important;
+    margin: 0 !important;
+    gap: 6px !important;
+    background: rgba(15, 23, 42, 0.95) !important;
+    border: 1px solid rgba(0, 240, 255, 0.3) !important;
+    border-radius: 6px !important;
+}
+
+.arena-container.in-game .caster-avatar-ring,
+.arena-container:has(#gameSection:not(.hidden)) .caster-avatar-ring {
+    width: 20px !important;
+    height: 20px !important;
+}
+
+.arena-container.in-game .caster-mic-glow,
+.arena-container:has(#gameSection:not(.hidden)) .caster-mic-glow {
+    font-size: 0.72rem !important;
+}
+
+.arena-container.in-game .caster-info,
+.arena-container:has(#gameSection:not(.hidden)) .caster-info {
+    display: none !important;
+}
+
+.arena-container.in-game .caster-bubble-container,
+.arena-container:has(#gameSection:not(.hidden)) .caster-bubble-container {
+    padding: 1px 6px !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+.arena-container.in-game .caster-speech-text,
+.arena-container:has(#gameSection:not(.hidden)) .caster-speech-text {
+    font-size: 0.74rem !important;
+    line-height: 1.15 !important;
+    color: var(--neon-cyan) !important;
+}
+
+.arena-container.in-game .caster-audio-toggle,
+.arena-container:has(#gameSection:not(.hidden)) .caster-audio-toggle {
+    width: 20px !important;
+    height: 20px !important;
+    font-size: 0.72rem !important;
+}
+
+.arena-container.in-game .match-bar,
+.arena-container:has(#gameSection:not(.hidden)) .match-bar {
+    padding: 2px 8px !important;
+    gap: 4px !important;
+    margin: 0 !important;
+}
+
+.arena-container.in-game .turn-timer-wrapper,
+.arena-container:has(#gameSection:not(.hidden)) .turn-timer-wrapper {
+    margin-top: 1px !important;
+    padding-top: 1px !important;
+    border-top: none !important;
+}
+
+.arena-container.in-game .turn-timer-header,
+.arena-container:has(#gameSection:not(.hidden)) .turn-timer-header {
+    font-size: 0.72rem !important;
+    margin-bottom: 1px !important;
+}
+
+.arena-container.in-game .turn-timer-track,
+.arena-container:has(#gameSection:not(.hidden)) .turn-timer-track {
+    height: 3px !important;
+}
+
+.arena-container.in-game .game-layout,
+.arena-container:has(#gameSection:not(.hidden)) .game-layout {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+}
+
+.arena-container.in-game .arena-board-wrapper,
+.arena-container:has(#gameSection:not(.hidden)) .arena-board-wrapper {
+    flex: 1 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+}
+
+.arena-container.in-game .sudoku-board-container,
+.arena-container:has(#gameSection:not(.hidden)) .sudoku-board-container {
+    padding: 1px !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    flex-shrink: 0 !important;
+}
+
+.arena-container.in-game .sudoku-grid,
+.arena-container:has(#gameSection:not(.hidden)) .sudoku-grid {
+    width: min(325px, calc(100dvh - 120px), 48vw) !important;
+    height: min(325px, calc(100dvh - 120px), 48vw) !important;
+}
+
+.arena-container.in-game .cell,
+.arena-container:has(#gameSection:not(.hidden)) .cell {
+    font-size: clamp(0.9rem, 2vh, 1.25rem) !important;
+}
+
+.arena-container.in-game .controls-container,
+.arena-container:has(#gameSection:not(.hidden)) .controls-container {
+    width: min(180px, 28vw) !important;
+    padding: 3px 6px !important;
+    gap: 4px !important;
+    max-height: min(325px, calc(100dvh - 120px)) !important;
+    justify-content: space-between !important;
+}
+
+.arena-container.in-game .numpad-grid,
+.arena-container:has(#gameSection:not(.hidden)) .numpad-grid {
+    gap: 3px !important;
+}
+
+.arena-container.in-game .numpad-btn,
+.arena-container:has(#gameSection:not(.hidden)) .numpad-btn {
+    padding: 4px 0 !important;
+    font-size: 1rem !important;
+    min-height: 28px !important;
+    border-radius: 6px !important;
+}
+
+.arena-container.in-game .board-actions,
+.arena-container:has(#gameSection:not(.hidden)) .board-actions {
+    gap: 3px !important;
+}
+
+.arena-container.in-game .board-actions .btn,
+.arena-container:has(#gameSection:not(.hidden)) .board-actions .btn {
+    padding: 4px 6px !important;
+    font-size: 0.74rem !important;
+    min-height: 26px !important;
+}
+
+/* Optimisation Spécifique Écrans de Petite Hauteur (Laptops 1366x768, écrans <= 640px) */
+@media (max-height: 640px) {
+    .arena-container.in-game,
+    .arena-container:has(#gameSection:not(.hidden)) {
+        padding: 1px 6px !important;
+        gap: 2px !important;
+    }
+
+    .arena-container.in-game .iot-led-station,
+    .arena-container:has(#gameSection:not(.hidden)) .iot-led-station {
+        padding: 1px 6px !important;
+    }
+
+    .arena-container.in-game .iot-title-left span:last-child,
+    .arena-container:has(#gameSection:not(.hidden)) .iot-title-left span:last-child {
+        display: none !important;
+    }
+
+    .arena-container.in-game .led-bar-label,
+    .arena-container:has(#gameSection:not(.hidden)) .led-bar-label {
+        display: none !important;
+    }
+
+    .arena-container.in-game .caster-hud-card,
+    .arena-container:has(#gameSection:not(.hidden)) .caster-hud-card {
+        padding: 1px 6px !important;
+        min-height: 20px !important;
+    }
+
+    .arena-container.in-game .caster-speech-text,
+    .arena-container:has(#gameSection:not(.hidden)) .caster-speech-text {
+        font-size: 0.70rem !important;
+        line-height: 1.1 !important;
+    }
+
+    .arena-container.in-game .match-bar,
+    .arena-container:has(#gameSection:not(.hidden)) .match-bar {
+        padding: 2px 6px !important;
+        gap: 2px !important;
+    }
+
+    .arena-container.in-game .room-badge,
+    .arena-container:has(#gameSection:not(.hidden)) .room-badge {
+        font-size: 0.70rem !important;
+    }
+
+    .arena-container.in-game .player-info,
+    .arena-container:has(#gameSection:not(.hidden)) .player-info {
+        font-size: 0.68rem !important;
+        margin-bottom: 0 !important;
+    }
+
+    .arena-container.in-game .track,
+    .arena-container:has(#gameSection:not(.hidden)) .track {
+        height: 3px !important;
+    }
+
+    .arena-container.in-game .turn-timer-wrapper,
+    .arena-container:has(#gameSection:not(.hidden)) .turn-timer-wrapper {
+        margin-top: 1px !important;
+        padding-top: 1px !important;
+    }
+
+    .arena-container.in-game .turn-timer-header,
+    .arena-container:has(#gameSection:not(.hidden)) .turn-timer-header {
+        font-size: 0.68rem !important;
+        margin-bottom: 1px !important;
+    }
+
+    .arena-container.in-game .turn-timer-track,
+    .arena-container:has(#gameSection:not(.hidden)) .turn-timer-track {
+        height: 3px !important;
+    }
+
+    .arena-container.in-game .sudoku-grid,
+    .arena-container:has(#gameSection:not(.hidden)) .sudoku-grid {
+        width: min(320px, calc(100dvh - 110px), 50vw) !important;
+        height: min(320px, calc(100dvh - 110px), 50vw) !important;
+    }
+
+    .arena-container.in-game .controls-container,
+    .arena-container:has(#gameSection:not(.hidden)) .controls-container {
+        width: min(175px, 28vw) !important;
+        padding: 2px 5px !important;
+        gap: 3px !important;
+        max-height: min(320px, calc(100dvh - 110px)) !important;
+    }
+
+    .arena-container.in-game .numpad-btn,
+    .arena-container:has(#gameSection:not(.hidden)) .numpad-btn {
+        padding: 3px 0 !important;
+        font-size: 0.95rem !important;
+        min-height: 26px !important;
+    }
+
+    .arena-container.in-game .board-actions .btn,
+    .arena-container:has(#gameSection:not(.hidden)) .board-actions .btn {
+        padding: 3px 5px !important;
+        font-size: 0.70rem !important;
+        min-height: 24px !important;
+    }
+}
+
+/* Optimisation Compacte du Lobby pour Écrans <= 680px (Visibilité directe des boutons de lancement) */
+@media (max-height: 680px) {
+    body:not(.in-game) {
+        padding: 2px 8px;
+    }
+
+    body:not(.in-game) .brand-header {
+        padding: 0;
+        margin-bottom: 2px;
+    }
+
+    body:not(.in-game) .glitch-title {
+        font-size: 1.25rem;
+    }
+
+    body:not(.in-game) .subtitle {
+        display: none;
+    }
+
+    body:not(.in-game) .iot-led-station {
+        padding: 2px 8px;
+    }
+
+    body:not(.in-game) .caster-hud-card {
+        padding: 2px 8px;
+        min-height: 24px;
+        gap: 6px;
+    }
+
+    body:not(.in-game) .caster-speech-text {
+        font-size: 0.74rem;
+        line-height: 1.15;
+    }
+
+    body:not(.in-game) .lobby-card {
+        padding: 6px 10px;
+    }
+
+    body:not(.in-game) .lobby-card h2 {
+        font-size: 0.95rem;
+        margin-bottom: 2px;
+    }
+
+    body:not(.in-game) .form-group {
+        margin-bottom: 4px;
+    }
+
+    body:not(.in-game) .form-group label,
+    body:not(.in-game) .select-group label {
+        font-size: 0.70rem;
+        margin-bottom: 1px;
+    }
+
+    body:not(.in-game) input,
+    body:not(.in-game) select {
+        padding: 3px 6px;
+        font-size: 0.75rem;
+    }
+
+    body:not(.in-game) .actions-grid {
+        gap: 6px;
+    }
+
+    body:not(.in-game) .action-box {
+        padding: 6px 8px;
+        gap: 4px;
+        border-radius: 8px;
+    }
+
+    body:not(.in-game) .action-box h3 {
+        font-size: 0.85rem;
+    }
+
+    body:not(.in-game) .select-group {
+        margin-bottom: 2px;
+    }
+
+    body:not(.in-game) .helper-text {
+        font-size: 0.60rem;
+        line-height: 1.1;
+        margin-top: 1px;
+    }
+
+    body:not(.in-game) .btn {
+        padding: 4px 8px;
+        font-size: 0.76rem;
+        min-height: 26px;
+    }
+
+    body:not(.in-game) .ai-hero-card {
+        flex: 1;
+        min-height: 160px;
+        height: auto;
+    }
+
+    body:not(.in-game) .ai-hero-overlay {
+        padding: 6px 8px;
+        gap: 3px;
+    }
+
+    body:not(.in-game) .ai-hero-title {
+        font-size: 0.95rem;
+    }
+
+    body:not(.in-game) .ai-hero-desc {
+        font-size: 0.68rem;
+        line-height: 1.25;
+    }
+
+    body:not(.in-game) .action-desc {
+        font-size: 0.68rem;
+        line-height: 1.25;
+    }
 }
 
 @media (max-width: 768px) {
@@ -964,7 +1405,7 @@ input:focus, select:focus {
         gap: 6px;
     }
 
-    .arena-container.in-game .virtual-led-container {
+    .arena-container.in-game .iot-led-station {
         display: none;
     }
 
@@ -974,8 +1415,8 @@ input:focus, select:focus {
     }
 
     .arena-container.in-game .sudoku-grid {
-        width: min(340px, calc(100dvh - 210px), 92vw);
-        height: min(340px, calc(100dvh - 210px), 92vw);
+        width: min(340px, calc(100dvh - 190px), 92vw);
+        height: min(340px, calc(100dvh - 190px), 92vw);
     }
 
     .arena-container.in-game .controls-container {
@@ -996,7 +1437,7 @@ input:focus, select:focus {
 }
 
 /* ========================================================
-   🌐 SÉLECTEUR DE LANGUE TRILINGUE (FR / EN / DE)
+   SELECTEUR DE LANGUE TRILINGUE (FR / EN / DE)
 ======================================================== */
 .lang-selector-group {
     display: flex;
@@ -1030,7 +1471,7 @@ input:focus, select:focus {
 }
 
 /* ========================================================
-   🎙️ PUPITRE DU COMMENTATEUR : KI FRAID CASTER
+   PUPITRE DU COMMENTATEUR : KI FRAID CASTER
 ======================================================== */
 .caster-hud-card {
     display: flex;
@@ -1109,11 +1550,37 @@ input:focus, select:focus {
 
 .caster-bubble-container {
     flex: 1;
-    background: rgba(2, 6, 23, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(2, 6, 23, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 10px;
     padding: 10px 16px;
     position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.caster-visualizer {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.caster-visualizer .vbar {
+    width: 3px;
+    height: 4px;
+    background: var(--neon-cyan);
+    border-radius: 2px;
+    box-shadow: 0 0 6px var(--neon-cyan);
+    transition: height 0.08s ease;
+}
+
+.caster-visualizer.speaking .vbar {
+    background: linear-gradient(to top, var(--neon-cyan), var(--neon-purple));
+    box-shadow: 0 0 10px var(--neon-cyan);
 }
 
 .caster-speech-text {
@@ -1168,4 +1635,7 @@ input:focus, select:focus {
         justify-content: space-between;
     }
 }
+
+
+
 

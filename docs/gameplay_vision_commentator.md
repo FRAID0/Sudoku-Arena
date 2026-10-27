@@ -147,7 +147,41 @@ Comme lors d'une retransmission sportive e-sport :
 
 | Phase | Intitulé | Tâches & Livrables | Statut |
 | :--- | :--- | :--- | :--- |
-| **Phase G1** | **Moteur de Règles Clash & Combos** | `ClashRule` (strict, combo_capped, unlimited), streak tracking, 27 tests unitaires. | ✅ **TERMINÉE** |
-| **Phase G2** | **Catalogue Trilingue & Module Commentateur** | Création de `frontend/commentator.js` avec catalogue FR/EN/DE, Web Speech API et sélecteur de langue. | 🎯 **EN COURS** |
-| **Phase G3** | **Onboarding Zéro-Friction & UI Avatar** | Bouton « Jouer vs KI FRAID » en 1 clic, bulles animées de l'avatar et sélecteur de variantes. | ⏳ Prochaine étape |
-| **Phase G4** | **Mémoire des Matchs & Résumés IA** | Historique des duels, bouton de revanche rapide, résumés Gemini post-match. | ⏳ Futur |
+| **Phase G1** | **Moteur de Règles Clash & Combos** | `ClashRule` (strict, combo_capped, unlimited), streak tracking, tests unitaires. | ✅ **TERMINÉE** |
+| **Phase G2** | **Catalogue Trilingue & Caster HUD** | Création de `frontend/commentator.js`, sélecteur de langue FR/EN/DE, HUD animé avec égaliseur. | ✅ **TERMINÉE** |
+| **Phase G2.5** | **Banc d'Essai Audio & Refonte SFX** | Page `audio-benchmark.html`, pack Edge-TTS 3 langues (54 répliques), 5 SFX feutrés harmoniques. | ✅ **TERMINÉE** |
+| **Phase G3** | **Intégration Pack Audio & Voix Sélectionnées** | Raccordement des fichiers pré-générés au moteur de jeu et aux changements de modes. | 🎯 **À VENIR** |
+| **Phase G4** | **Mémoire des Matchs & Résumés IA (Gemini)** | Historique des duels, bouton de revanche rapide, résumés Gemini post-match. | ⏳ Futur |
+
+---
+
+## 9. 🎧 Banc d'Essai Audio Trilingue & Décision Vocale (`audio-benchmark.html`)
+
+Suite au diagnostic de confort sonore (élimination des bips 8-bit stridents et des voix robotiques non filtrées), un banc d'essai audio dédié a été conçu pour permettre une validation à l'écoute :
+
+### 🎙️ Voix Évaluées par Langue
+- 🇫🇷 **Français** :
+  - `fr-FR-HenriNeural` (Masculin — Sportif & Incisif, Recommandé Caster)
+  - `fr-FR-RemyMultilingualNeural` (Masculin — Chaleureux & Multilingue)
+  - `fr-FR-DeniseNeural` (Féminin — Posé & Radio)
+  - `Web Speech API` (Voix locale système — Ligne de base comparative)
+- 🇬🇧 **Anglais** :
+  - `en-US-GuyNeural` (US Masculin — Dynamique & Énergique, Recommandé)
+  - `en-US-AriaNeural` (US Féminin — Clair & Précis)
+  - `en-GB-RyanNeural` (UK Masculin — Accent Britannique)
+- 🇩🇪 **Allemand** :
+  - `de-DE-ConradNeural` (Masculin — Posé & Souverain, Recommandé)
+  - `de-DE-KatjaNeural` (Féminin — Énergique)
+  - `de-DE-FlorianMultilingualNeural` (Masculin — Moderne)
+
+### 🎛️ Refonte des Effets Sonores (SFX Grille)
+- **Sélection de Case** : Clic feutré organique (`click_soft.wav`) remplaçant le bip 440 Hz.
+- **Chiffre Validé** : Accord montant C5-E5-G5 style marimba (`valid_chord.wav`) remplaçant le bip 523 Hz.
+- **Combo x2** : Whoosh laser montant + accord carillon brillant (`combo_burst.wav`).
+- **Erreur** : Thud basse fréquence feutré 110 Hz (`error_soft.wav`) remplaçant le buzzer criard 220 Hz.
+- **Victoire** : Fanfare cristalline ascendante (`victory_chime.wav`).
+
+### 🔗 Accès & Utilisation
+Le laboratoire audio est accessible directement en local à l'adresse :  
+👉 **`http://localhost:8080/audio-benchmark.html`** (ou via l'icône 🎧 dans le pupitre KI FRAID du lobby).
+

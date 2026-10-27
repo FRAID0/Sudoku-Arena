@@ -52,6 +52,43 @@ TURN_TIMEOUTS = {
     'hard': 10.0
 }
 
+REASON_MESSAGES = {
+    "ERR_INVALID_DATA": {
+        "fr": "Coordonnées ou valeur non numériques.",
+        "en": "Non-numeric coordinates or value.",
+        "de": "Nicht-numerische Koordinaten oder Werte."
+    },
+    "ERR_OUT_OF_BOUNDS": {
+        "fr": "Coordonnées (0-8) ou chiffre (1-9) hors limites.",
+        "en": "Coordinates (0-8) or number (1-9) out of bounds.",
+        "de": "Koordinaten (0-8) oder Zahl (1-9) außerhalb des gültigen Bereichs."
+    },
+    "ERR_NOT_YOUR_TURN": {
+        "fr": "Ce n'est pas votre tour !",
+        "en": "It is not your turn!",
+        "de": "Du bist nicht am Zug!"
+    },
+    "ERR_CELL_FILLED": {
+        "fr": "Cette case est déjà remplie.",
+        "en": "This cell is already filled.",
+        "de": "Dieses Feld ist bereits belegt."
+    },
+    "ERR_INCORRECT_SOLUTION": {
+        "fr": "Chiffre incorrect (ne correspond pas à la solution finale du casse-tête).",
+        "en": "Incorrect number (does not match the puzzle's final solution).",
+        "de": "Falsche Zahl (stimmt nicht mit der finalen Lösung des Rätsels überein)."
+    },
+    "ERR_CONFLICT": {
+        "fr": "Conflit : ce chiffre est déjà présent sur la même ligne, colonne ou bloc 3x3 !",
+        "en": "Conflict: this number is already in the same row, column, or 3x3 box!",
+        "de": "Konflikt: Diese Zahl existiert bereits in derselben Zeile, Spalte oder im 3x3-Block!"
+    }
+}
+
+def get_localized_reason(code: str, lang: str = "fr") -> str:
+    lang_pack = REASON_MESSAGES.get(code, {})
+    return lang_pack.get(lang, lang_pack.get("fr", code))
+
 
 class Player:
     def __init__(self, player_id: str, name: str, is_host: bool = False):
@@ -94,11 +131,12 @@ class Player:
 
 
 class Room:
-    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED):
+    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED, lang: str = "fr"):
         self.room_code = room_code
         self.mode = mode
         self.difficulty = difficulty.lower() if difficulty.lower() in POINTS else "medium"
         self.validation_mode = validation_mode.lower() if validation_mode.lower() in ("simple", "strict") else "simple"
+        self.lang = lang.lower() if lang.lower() in ("fr", "en", "de") else "fr"
         if isinstance(clash_rule, ClashRule):
             self.clash_rule = clash_rule
         else:
@@ -133,6 +171,7 @@ class Room:
             "difficulty": self.difficulty,
             "validation_mode": self.validation_mode,
             "clash_rule": self.clash_rule.value if isinstance(self.clash_rule, ClashRule) else str(self.clash_rule),
+            "lang": self.lang,
             "current_combo_streak": self.current_combo_streak,
             "state": self.state.value if isinstance(self.state, RoomState) else str(self.state),
             "created_at": self.created_at,
@@ -180,7 +219,8 @@ class Room:
             mode=mode,
             difficulty=data.get("difficulty", "medium"),
             validation_mode=data.get("validation_mode", "simple"),
-            clash_rule=clash_rule
+            clash_rule=clash_rule,
+            lang=data.get("lang", "fr")
         )
         room.current_combo_streak = int(data.get("current_combo_streak", 0))
         state_val = data.get("state", "waiting")
@@ -261,10 +301,14 @@ class RoomManager:
                 return code
         raise RuntimeError("Impossible de générer un code de salon unique")
 
-    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED) -> Room:
+    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED, lang: str = "fr") -> Room:
         code = self._generate_unique_code()
+        default_names = {"fr": "Joueur 1", "en": "Player 1", "de": "Spieler 1"}
+        if not host_name or not host_name.strip() or host_name.strip() in ("Joueur 1", "Player 1", "Spieler 1"):
+            host_name = default_names.get(lang, "Joueur 1")
+
         host = Player(player_id=host_id, name=host_name, is_host=True)
-        room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty, validation_mode=validation_mode, clash_rule=clash_rule)
+        room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty, validation_mode=validation_mode, clash_rule=clash_rule, lang=lang)
 
         # Générer le puzzle
         puzzle, solution = SudokuEngine.generate_puzzle(difficulty)
@@ -275,7 +319,9 @@ class RoomManager:
 
         # Si mode Solo AI, inscrire automatiquement le bot comme Joueur 2
         if mode == GameMode.SOLO_AI:
-            bot_player = Player(player_id="bot_ki_fraid", name="KI FRAID 🤖", is_host=False)
+            bot_names = {"fr": "IA FRAID 🤖", "en": "AI FRAID 🤖", "de": "KI FRAID 🤖"}
+            bot_name = bot_names.get(room.lang, "IA FRAID 🤖")
+            bot_player = Player(player_id="bot_ki_fraid", name=bot_name, is_host=False)
             bot_player.grid = copy.deepcopy(puzzle)
             room.players[bot_player.player_id] = bot_player
 
@@ -287,6 +333,10 @@ class RoomManager:
         room = self.rooms.get(code)
         if not room:
             raise ValueError(f"Salon '{code}' introuvable.")
+
+        default_p2 = {"fr": "Joueur 2", "en": "Player 2", "de": "Spieler 2"}
+        if not player_name or not player_name.strip() or player_name.strip() in ("Joueur 2", "Player 2", "Spieler 2", "Challenger"):
+            player_name = default_p2.get(room.lang, "Joueur 2")
 
         if player_id in room.players:
             room.players[player_id].is_connected = True
@@ -337,10 +387,20 @@ class RoomManager:
         try:
             row, col, value = int(row), int(col), int(value)
         except (ValueError, TypeError):
-            return {"valid": False, "rejected": True, "reason": "Coordonnées ou valeur non numériques."}
+            return {
+                "valid": False,
+                "rejected": True,
+                "reason_code": "ERR_INVALID_DATA",
+                "reason": get_localized_reason("ERR_INVALID_DATA", room.lang)
+            }
 
         if not (0 <= row < 9 and 0 <= col < 9 and 1 <= value <= 9):
-            return {"valid": False, "rejected": True, "reason": "Coordonnées (0-8) ou chiffre (1-9) hors limites."}
+            return {
+                "valid": False,
+                "rejected": True,
+                "reason_code": "ERR_OUT_OF_BOUNDS",
+                "reason": get_localized_reason("ERR_OUT_OF_BOUNDS", room.lang)
+            }
 
         # En mode Clash ou Solo AI : vérifier impérativement si c'est son tour
         if room.mode in (GameMode.CLASH, GameMode.SOLO_AI):
@@ -348,7 +408,8 @@ class RoomManager:
                 return {
                     "valid": False,
                     "rejected": True,
-                    "reason": "Ce n'est pas votre tour !",
+                    "reason_code": "ERR_NOT_YOUR_TURN",
+                    "reason": get_localized_reason("ERR_NOT_YOUR_TURN", room.lang),
                     "current_turn": room.current_turn_player_id
                 }
 
@@ -356,7 +417,12 @@ class RoomManager:
 
         # Case déjà remplie
         if target_grid[row][col] != 0:
-            return {"valid": False, "rejected": True, "reason": "Cette case est déjà remplie."}
+            return {
+                "valid": False,
+                "rejected": True,
+                "reason_code": "ERR_CELL_FILLED",
+                "reason": get_localized_reason("ERR_CELL_FILLED", room.lang)
+            }
 
         time_taken = time.time() - (room.turn_start_time or time.time())
 
@@ -365,10 +431,12 @@ class RoomManager:
         # - Mode 'simple' (Règles locales) : doit respecter la ligne, la colonne et le bloc 3x3 actuel
         if room.validation_mode == "strict":
             is_valid = SudokuEngine.validate_move(room.solution, row, col, value)
-            error_reason = "Chiffre incorrect (ne correspond pas à la solution finale du casse-tête)."
+            error_code = "ERR_INCORRECT_SOLUTION"
+            error_reason = get_localized_reason(error_code, room.lang)
         else:
             is_valid = SudokuEngine.is_valid_placement(target_grid, row, col, value)
-            error_reason = "Conflit : ce chiffre est déjà présent sur la même ligne, colonne ou bloc 3x3 !"
+            error_code = "ERR_CONFLICT"
+            error_reason = get_localized_reason(error_code, room.lang)
 
         if is_valid:
             target_grid[row][col] = value
@@ -460,6 +528,7 @@ class RoomManager:
                 "is_combo": False,
                 "clash_rule": room.clash_rule.value,
                 "game_over": False,
+                "reason_code": error_code,
                 "reason": error_reason
             }
 
@@ -470,10 +539,8 @@ class RoomManager:
             return None
 
         current_player = room.players.get(room.current_turn_player_id)
-        if current_player:
-            current_player.score = max(0.0, current_player.score - 1.0)
-            current_player.mistakes += 1
-
+        # Timeout ne déduit plus de pénalité : on conserve les points acquis.
+        # La seule pénalité s'applique lors d'un mouvement invalide.
         room.current_combo_streak = 0
         next_player = room.switch_turn()
         return {

@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Banc d'Essai Audio Trilingue — Sudoku Arena (KI FRAID)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Outfit:wght@300;400;600;700;900&family=Rajdhani:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #070b14;
+            --card-bg: rgba(15, 23, 42, 0.85);
+            --border-color: rgba(56, 189, 248, 0.25);
+            --neon-cyan: #00f0ff;
+            --neon-purple: #a855f7;
+            --neon-pink: #f43f5e;
+            --neon-green: #10b981;
+            --neon-amber: #f59e0b;
+            --text-primary: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 90%, rgba(168, 85, 247, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.8) 0%, transparent 100%);
+            color: var(--text-primary);
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1060px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Top Header */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            backdrop-filter: blur(12px);
+        }
+
+        .back-link {
+            color: var(--neon-cyan);
+            text-decoration: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .back-link:hover {
+            text-shadow: 0 0 10px var(--neon-cyan);
+            transform: translateX(-3px);
+        }
+
+        .header-title {
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .header-title h1 {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .header-title h1 span {
+            color: var(--neon-cyan);
+            text-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+        }
+
+        .header-title p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-top: 4px;
+        }
+
+        /* Language Bar */
+        .lang-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .lang-tab-btn {
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-muted);
+            padding: 10px 24px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .lang-tab-btn:hover {
+            color: #fff;
+            border-color: var(--neon-cyan);
+        }
+
+        .lang-tab-btn.active {
+            background: rgba(0, 240, 255, 0.15);
+            color: var(--neon-cyan);
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 16px rgba(0, 240, 255, 0.35);
+        }
+
+        /* Section Layout */
+        .bench-section {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 14px;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: #fff;
+        }
+
+        .section-title .badge {
+            font-size: 0.7rem;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(0, 240, 255, 0.12);
+            color: var(--neon-cyan);
+            border: 1px solid var(--neon-cyan);
+        }
+
+        /* Volume controls */
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-muted);
+        }
+
+        .volume-control input[type="range"] {
+            accent-color: var(--neon-cyan);
+            cursor: pointer;
+            width: 100px;
+        }
+
+        /* Voice Selection Selector Pills */
+        .voice-pills-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .voice-pill {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .voice-pill:hover {
+            border-color: var(--neon-cyan);
+            color: #fff;
+        }
+
+        .voice-pill.active {
+            background: rgba(168, 85, 247, 0.2);
+            border-color: var(--neon-purple);
+            color: #fff;
+            box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
+        }
+
+        .voice-pill.web-speech {
+            border-style: dashed;
+        }
+
+        .voice-pill.web-speech.active {
+            background: rgba(245, 158, 11, 0.2);
+            border-color: var(--neon-amber);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+        }
+
+        /* Phrase Category Grid */
+        .phrases-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+            gap: 14px;
+        }
+
+        .phrase-card {
+            background: rgba(10, 16, 31, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            position: relative;
+            transition: all 0.25s ease;
+        }
+
+        .phrase-card:hover {
+            border-color: rgba(0, 240, 255, 0.35);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .phrase-card.playing {
+            border-color: var(--neon-cyan);
+            box-shadow: 0 0 16px rgba(0, 240, 255, 0.3);
+        }
+
+        .phrase-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .phrase-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--neon-cyan);
+        }
+
+        .phrase-text {
+            font-size: 0.92rem;
+            color: #e2e8f0;
+            line-height: 1.45;
+            font-style: italic;
+            min-height: 48px;
+        }
+
+        .phrase-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+            padding-top: 6px;
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);
+            border: 1px solid var(--neon-cyan);
+            color: #fff;
+            padding: 7px 16px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .play-btn:hover {
+            background: var(--neon-cyan);
+            color: #070b14;
+            box-shadow: 0 0 14px var(--neon-cyan);
+        }
+
+        .play-btn.playing {
+            background: var(--neon-pink);
+            border-color: var(--neon-pink);
+            color: #fff;
+            box-shadow: 0 0 14px var(--neon-pink);
+        }
+
+        /* Equalizer inside card */
+        .mini-equalizer {
+            display: inline-flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 16px;
+        }
+
+        .mini-equalizer .bar {
+            width: 3px;
+            height: 4px;
+            background: var(--neon-cyan);
+            border-radius: 1px;
+            transition: height 0.08s ease;
+        }
+
+        .phrase-card.playing .mini-equalizer .bar {
+            background: var(--neon-green);
+            animation: miniEqAnim 0.4s infinite alternate ease-in-out;
+        }
+
+        .phrase-card.playing .mini-equalizer .bar:nth-child(2) { animation-delay: 0.1s; }
+        .phrase-card.playing .mini-equalizer .bar:nth-child(3) { animation-delay: 0.2s; }
+        .phrase-card.playing .mini-equalizer .bar:nth-child(4) { animation-delay: 0.15s; }
+
+        @keyframes miniEqAnim {
+            from { height: 4px; }
+            to { height: 16px; }
+        }
+
+        /* SFX Interactive Section */
+        .sfx-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 14px;
+        }
+
+        .sfx-card {
+            background: rgba(10, 16, 31, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .sfx-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .sfx-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .sfx-ab-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-sfx-new {
+            flex: 1;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-sfx-new:hover {
+            background: var(--neon-green);
+            color: #070b14;
+            box-shadow: 0 0 12px var(--neon-green);
+        }
+
+        .btn-sfx-old {
+            flex: 1;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #f87171;
+            padding: 8px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-sfx-old:hover {
+            background: var(--neon-red);
+            color: #fff;
+            box-shadow: 0 0 12px var(--neon-red);
+        }
+
+        /* Decision & Vote Box */
+        .decision-box {
+            background: linear-gradient(135deg, rgba(0, 240, 255, 0.06) 0%, rgba(168, 85, 247, 0.06) 100%);
+            border: 1px solid var(--neon-cyan);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .decision-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 14px;
+        }
+
+        .decision-item label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .decision-select {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .toast-status {
+            padding: 10px 16px;
+            border-radius: 8px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--neon-green);
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Navigation Top -->
+        <header class="top-nav">
+            <a href="index.html" class="back-link">
+                <span>◀</span> RETOUR À L'ARÈNE SUDOKU
+            </a>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--neon-cyan);">
+                🎙️ LAB AUDIO & BENCHMARK
+            </div>
+        </header>
+
+        <!-- Titre -->
+        <div class="header-title">
+            <h1>BANC D'ESSAI AUDIO — <span>KI FRAID CASTER</span></h1>
+            <p>Écoutez, comparez et validez les voix HD et effets sonores doux pour Sudoku Arena (FR, EN, DE)</p>
+        </div>
+
+        <!-- Onglets Langues Trilingues -->
+        <div class="lang-tabs" id="langTabs">
+            <button class="lang-tab-btn active" data-lang="fr">🇫🇷 Français</button>
+            <button class="lang-tab-btn" data-lang="en">🇬🇧 English</button>
+            <button class="lang-tab-btn" data-lang="de">🇩🇪 Deutsch</button>
+        </div>
+
+        <!-- SECTION 1 : VOIX DU COMMENTATEUR -->
+        <section class="bench-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>🎙️ ÉCHANTILLONS VOCAUX DU COMMENTATEUR</span>
+                    <span class="badge" id="currentLangBadge">LANGUE : FR</span>
+                </div>
+                <div class="volume-control">
+                    <span>🔊 VOLUME VOIX :</span>
+                    <input type="range" id="voiceVolume" min="0" max="1" step="0.05" value="0.9">
+                </div>
+            </div>
+
+            <!-- Sélecteur de Voix pour la langue active -->
+            <div class="voice-pills-group" id="voicePills">
+                <!-- Injecté dynamiquement par JS -->
+            </div>
+
+            <!-- Grille des 6 Catégories de Répliques -->
+            <div class="phrases-grid" id="phrasesGrid">
+                <!-- Injecté dynamiquement par JS -->
+            </div>
+        </section>
+
+        <!-- SECTION 2 : EFFETS SONORES (SFX) -->
+        <section class="bench-section">
+            <div class="section-header">
+                <div class="section-title">
+                    <span>🎛️ BRUITAGES EN JEU — TEST COMPARATIF A/B</span>
+                    <span class="badge" style="border-color: var(--neon-green); color: var(--neon-green);">FEUTRÉ VS AGRESSIF</span>
+                </div>
+                <div class="volume-control">
+                    <span>🔊 VOLUME SFX :</span>
+                    <input type="range" id="sfxVolume" min="0" max="1" step="0.05" value="0.7">
+                </div>
+            </div>
+
+            <p style="font-size: 0.9rem; color: var(--text-muted);">
+                Comparez les nouveaux bruitages cyber feutrés (notes rondes avec déclin doux) face aux anciens bips 8-bit stridents :
+            </p>
+
+            <div class="sfx-grid">
+                <!-- SFX 1 : Clic Case -->
+                <div class="sfx-card">
+                    <div class="sfx-card-header">
+                        <span>🔘 Sélection de Case (Grid Cell Click)</span>
+                    </div>
+                    <div class="sfx-desc">
+                        Déclenché lors du clic sur une case vide du Sudoku.
+                    </div>
+                    <div class="sfx-ab-actions">
+                        <button class="btn-sfx-new" onclick="playSfx('click_soft')">✨ Nouveau Clic Doux</button>
+                        <button class="btn-sfx-old" onclick="playLegacyBeep(440, 0.15)">⚠️ Ancien Bip (440Hz)</button>
+                    </div>
+                </div>
+
+                <!-- SFX 2 : Chiffre Validé -->
+                <div class="sfx-card">
+                    <div class="sfx-card-header">
+                        <span>✨ Chiffre Validé (Valid Placement)</span>
+                    </div>
+                    <div class="sfx-desc">
+                        Déclenché quand le chiffre posé est correct.
+                    </div>
+                    <div class="sfx-ab-actions">
+                        <button class="btn-sfx-new" onclick="playSfx('valid_chord')">✨ Accord Montant (C-E-G)</button>
+                        <button class="btn-sfx-old" onclick="playLegacyBeep(523.25, 0.12)">⚠️ Ancien Bip (523Hz)</button>
+                    </div>
+                </div>
+
+                <!-- SFX 3 : Combo x2 -->
+                <div class="sfx-card">
+                    <div class="sfx-card-header">
+                        <span>⚡ Combo x2 (Bonus Move)</span>
+                    </div>
+                    <div class="sfx-desc">
+                        Déclenché lors de deux coups réussis consécutifs en mode Clash.
+                    </div>
+                    <div class="sfx-ab-actions">
+                        <button class="btn-sfx-new" onclick="playSfx('combo_burst')">⚡ Whoosh + Carillon</button>
+                        <button class="btn-sfx-old" onclick="playLegacyBeep(659.25, 0.2)">⚠️ Ancien Bip Simple</button>
+                    </div>
+                </div>
+
+                <!-- SFX 4 : Erreur -->
+                <div class="sfx-card">
+                    <div class="sfx-card-header">
+                        <span>❌ Erreur / Chiffre Refusé</span>
+                    </div>
+                    <div class="sfx-desc">
+                        Déclenché en cas de conflit Sudoku ou de mauvaise déduction.
+                    </div>
+                    <div class="sfx-ab-actions">
+                        <button class="btn-sfx-new" onclick="playSfx('error_soft')">🛡️ Thud Basse Fréquence</button>
+                        <button class="btn-sfx-old" onclick="playLegacyBeep(220, 0.25)">⚠️ Ancien Buzzer (220Hz)</button>
+                    </div>
+                </div>
+
+                <!-- SFX 5 : Victoire -->
+                <div class="sfx-card">
+                    <div class="sfx-card-header">
+                        <span>🏆 Fin de Partie & Victoire</span>
+                    </div>
+                    <div class="sfx-desc">
+                        Déclenché à l'apparition de l'écran de fin de match.
+                    </div>
+                    <div class="sfx-ab-actions">
+                        <button class="btn-sfx-new" onclick="playSfx('victory_chime')">🏆 Fanfare Cristalline</button>
+                        <button class="btn-sfx-old" onclick="playLegacyBeep(880, 0.6)">⚠️ Bip Continu (880Hz)</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 3 : VERDICT & CHOIX DE VOIX -->
+        <section class="decision-box">
+            <div class="section-title">
+                <span>🎯 VOTRE CHOIX DE VOIX OFFICIELLES</span>
+                <span class="badge">CONFIGURATION PRÊTE POUR LE JEU</span>
+            </div>
+            <p style="font-size: 0.9rem; color: var(--text-muted);">
+                Sélectionnez vos voix favorites pour chaque langue après écoute :
+            </p>
+
+            <div class="decision-grid">
+                <div class="decision-item">
+                    <label>🇫🇷 Voix Française :</label>
+                    <select id="selectVoteFr" class="decision-select">
+                        <option value="fr-FR-HenriNeural" selected>fr-FR-HenriNeural (Masculin Sportif - Recommandé)</option>
+                        <option value="fr-FR-RemyMultilingualNeural">fr-FR-RemyMultilingualNeural (Masculin Chaleureux)</option>
+                        <option value="fr-FR-DeniseNeural">fr-FR-DeniseNeural (Féminin Posé/Radio)</option>
+                        <option value="web_speech">Web Speech API (Voix Navigateur)</option>
+                    </select>
+                </div>
+
+                <div class="decision-item">
+                    <label>🇬🇧 Voix Anglaise :</label>
+                    <select id="selectVoteEn" class="decision-select">
+                        <option value="en-US-GuyNeural" selected>en-US-GuyNeural (US Masculin Dynamique - Recommandé)</option>
+                        <option value="en-GB-RyanNeural">en-GB-RyanNeural (UK Masculin)</option>
+                        <option value="en-US-AriaNeural">en-US-AriaNeural (US Féminin Clair)</option>
+                        <option value="web_speech">Web Speech API (Voix Navigateur)</option>
+                    </select>
+                </div>
+
+                <div class="decision-item">
+                    <label>🇩🇪 Voix Allemande :</label>
+                    <select id="selectVoteDe" class="decision-select">
+                        <option value="de-DE-ConradNeural" selected>de-DE-ConradNeural (Masculin Posé - Recommandé)</option>
+                        <option value="de-DE-KatjaNeural">de-DE-KatjaNeural (Féminin Énergique)</option>
+                        <option value="de-DE-FlorianMultilingualNeural">de-DE-FlorianMultilingualNeural (Masculin Moderne)</option>
+                        <option value="web_speech">Web Speech API (Voix Navigateur)</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="play-btn" style="align-self: flex-start; padding: 10px 20px;" onclick="saveVoicePreferences()">
+                💾 Enregistrer & Valider ces voix
+            </button>
+            <div id="saveToast" class="toast-status">
+                ✅ Choix enregistré avec succès dans localStorage !
+            </div>
+        </section>
+    </div>
+
+    <!-- SCRIPT DU BANC D'ESSAI -->
+    <script>
+        const BENCHMARK_DATA = {
+            fr: {
+                label: "Français",
+                voices: [
+                    { id: "fr-FR-HenriNeural", name: "Henri", badge: "Sportif & Incisif (Recommandé)", icon: "🎙️" },
+                    { id: "fr-FR-RemyMultilingualNeural", name: "Remy", badge: "Chaleureux & Multilingue", icon: "🎙️" },
+                    { id: "fr-FR-DeniseNeural", name: "Denise", badge: "Radio & Posée", icon: "🎙️" },
+                    { id: "web_speech", name: "Web Speech API", badge: "Voix Système Locale (Référence)", icon: "🤖" }
+                ],
+                phrases: [
+                    { key: "WELCOME", title: "🌟 Accueil Général", text: "Bienvenue dans Sudoku Arena ! Préparez vos neurones, aujourd'hui chaque coup compte !" },
+                    { key: "MODE_CLASH", title: "⚔️ Règle : Mode Clash", text: "Mode Clash sélectionné ! Ici, c'est du tour par tour stratégique : vous partagez la même grille, et chaque chiffre validé rapporte des points avec bonus de combo !" },
+                    { key: "MODE_RACE", title: "🏎️ Règle : Mode Course", text: "Mode Course sélectionné ! Deux joueurs, une grille identique en miroir. Pas de tour, c'est un pur speedrun : le premier qui boucle sa grille gagne le duel !" },
+                    { key: "COMBO_X2", title: "⚡ Action : Combo x2", text: "Combo x2 ! Deux coups d'affilée, quelle vista ! Le public est en ébullition !" },
+                    { key: "ERROR", title: "❌ Action : Erreur", text: "Aïe, chiffre refusé ! Cette erreur coûte cher, la main passe immédiatement à l'adversaire !" },
+                    { key: "VICTORY", title: "🏆 Fin : Victoire", text: "Victoire éclatante ! Quel duel d'anthologie, l'arène a trouvé son véritable champion !" }
+                ]
+            },
+            en: {
+                label: "English",
+                voices: [
+                    { id: "en-US-GuyNeural", name: "Guy (US)", badge: "Energetic Caster (Recommended)", icon: "🎙️" },
+                    { id: "en-US-AriaNeural", name: "Aria (US)", badge: "Clear & Crisp", icon: "🎙️" },
+                    { id: "en-GB-RyanNeural", name: "Ryan (UK)", badge: "British Announcer", icon: "🎙️" },
+                    { id: "web_speech", name: "Web Speech API", badge: "Default Local Voice (Baseline)", icon: "🤖" }
+                ],
+                phrases: [
+                    { key: "WELCOME", title: "🌟 Arena Welcome", text: "Welcome to Sudoku Arena! Sharpen your mind, every move matters today!" },
+                    { key: "MODE_CLASH", title: "⚔️ Rule: Clash Mode", text: "Clash Mode selected! Turn-based strategy: you share the same grid, and every valid number earns points with combo multipliers!" },
+                    { key: "MODE_RACE", title: "🏎️ Rule: Race Mode", text: "Race Mode selected! Two players, identical mirror grid. No turns, pure speedrun: the first to finish wins the duel!" },
+                    { key: "COMBO_X2", title: "⚡ Action: Combo x2", text: "Combo x2! Two consecutive hits, pure brilliance! The crowd is going wild!" },
+                    { key: "ERROR", title: "❌ Action: Mistake", text: "Ouch, invalid number! That mistake hurts, the turn switches immediately to your opponent!" },
+                    { key: "VICTORY", title: "🏆 End: Victory", text: "Spectacular victory! What an incredible match, the Arena has found its true champion!" }
+                ]
+            },
+            de: {
+                label: "Deutsch",
+                voices: [
+                    { id: "de-DE-ConradNeural", name: "Conrad", badge: "Präzise & Souverän (Empfohlen)", icon: "🎙️" },
+                    { id: "de-DE-KatjaNeural", name: "Katja", badge: "Dynamisch & Kraftvoll", icon: "🎙️" },
+                    { id: "de-DE-FlorianMultilingualNeural", name: "Florian", badge: "Modern & Klar", icon: "🎙️" },
+                    { id: "web_speech", name: "Web Speech API", badge: "Systemstimme (Referenz)", icon: "🤖" }
+                ],
+                phrases: [
+                    { key: "WELCOME", title: "🌟 Arena-Empfang", text: "Willkommen in der Sudoku Arena! Schärfe deinen Verstand, heute zählt jeder Zug!" },
+                    { key: "MODE_CLASH", title: "⚔️ Regel: Clash-Modus", text: "Clash-Modus ausgewählt! Rundenbasierte Strategie: Ihr teilt euch dasselbe Gitter, und jede richtige Zahl bringt Punkte mit Combo-Bonus!" },
+                    { key: "MODE_RACE", title: "🏎️ Regel: Renn-Modus", text: "Renn-Modus ausgewählt! Zwei Spieler, identisches Spiegel-Gitter. Reine Geschwindigkeit: Wer das Gitter zuerst löst, gewinnt!" },
+                    { key: "COMBO_X2", title: "⚡ Aktion: Combo x2", text: "Combo x2! Zwei Treffer in Folge, meisterhaft! Das Publikum tobt!" },
+                    { key: "ERROR", title: "❌ Aktion: Fehler", text: "Autsch, ungültiger Zug! Ein teurer Fehler, die Runde wechselt sofort zum Gegner!" },
+                    { key: "VICTORY", title: "🏆 Ende: Sieg", text: "Glanzvoller Sieg! Was für ein legendäres Duell, die Arena hat ihren wahren Champion gefunden!" }
+                ]
+            }
+        };
+
+        let currentLang = "fr";
+        let currentVoice = "fr-FR-HenriNeural";
+        let currentAudio = null;
+        let currentActiveCard = null;
+
+        // Web Audio Context pour SFX & ancien oscillateur
+        let audioCtx = null;
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioCtx;
+        }
+
+        // Ancien bip agressif
+        function playLegacyBeep(freq = 440, duration = 0.15) {
+            try {
+                const ctx = getAudioContext();
+                if (ctx.state === "suspended") ctx.resume();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const vol = parseFloat(document.getElementById("sfxVolume").value) || 0.7;
+                osc.frequency.value = freq;
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                gain.gain.setValueAtTime(0.2 * vol, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Nouveau SFX feutré
+        function playSfx(name) {
+            const vol = parseFloat(document.getElementById("sfxVolume").value) || 0.7;
+            const audio = new Audio(`assets/audio/sfx/${name}.wav`);
+            audio.volume = vol;
+            audio.play().catch(e => console.warn("Erreur lecture SFX:", e));
+        }
+
+        // Rendu de l'interface
+        function renderVoicePills() {
+            const container = document.getElementById("voicePills");
+            container.innerHTML = "";
+            const voices = BENCHMARK_DATA[currentLang].voices;
+
+            voices.forEach((v, index) => {
+                const pill = document.createElement("button");
+                pill.className = `voice-pill ${v.id === "web_speech" ? "web-speech" : ""} ${v.id === currentVoice ? "active" : ""}`;
+                pill.innerHTML = `<span>${v.icon}</span> <strong>${v.name}</strong> <small style="opacity: 0.8; font-size: 0.75rem;">(${v.badge})</small>`;
+                pill.onclick = () => {
+                    currentVoice = v.id;
+                    renderVoicePills();
+                };
+                container.appendChild(pill);
+            });
+        }
+
+        function renderPhrases() {
+            const container = document.getElementById("phrasesGrid");
+            container.innerHTML = "";
+            const phrases = BENCHMARK_DATA[currentLang].phrases;
+
+            phrases.forEach(p => {
+                const card = document.createElement("div");
+                card.className = "phrase-card";
+                card.id = `card_${p.key}`;
+                card.innerHTML = `
+                    <div class="phrase-card-header">
+                        <span class="phrase-tag">${p.title}</span>
+                        <div class="mini-equalizer">
+                            <span class="bar"></span>
+                            <span class="bar"></span>
+                            <span class="bar"></span>
+                            <span class="bar"></span>
+                        </div>
+                    </div>
+                    <p class="phrase-text">« ${p.text} »</p>
+                    <div class="phrase-card-footer">
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted);">${p.key}.mp3</span>
+                        <button class="play-btn" onclick="playVoiceSample('${p.key}', '${p.text.replace(/'/g, "\\'")}', this)">
+                            ▶ Écouter
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll(".lang-tab-btn").forEach(b => {
+                b.classList.toggle("active", b.dataset.lang === lang);
+            });
+            document.getElementById("currentLangBadge").textContent = `LANGUE : ${lang.toUpperCase()}`;
+
+            // Choisir la première voix par défaut
+            currentVoice = BENCHMARK_DATA[lang].voices[0].id;
+            renderVoicePills();
+            renderPhrases();
+            stopCurrentVoice();
+        }
+
+        function stopCurrentVoice() {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio = null;
+            }
+            if ("speechSynthesis" in window) {
+                window.speechSynthesis.cancel();
+            }
+            if (currentActiveCard) {
+                currentActiveCard.classList.remove("playing");
+                const btn = currentActiveCard.querySelector(".play-btn");
+                if (btn) {
+                    btn.innerHTML = "▶ Écouter";
+                    btn.classList.remove("playing");
+                }
+                currentActiveCard = null;
+            }
+        }
+
+        function playVoiceSample(key, text, btn) {
+            const card = document.getElementById(`card_${key}`);
+            const vol = parseFloat(document.getElementById("voiceVolume").value) || 0.9;
+
+            // Si déjà en cours de lecture sur cette carte, on arrête
+            if (currentActiveCard === card && (currentAudio || window.speechSynthesis.speaking)) {
+                stopCurrentVoice();
+                return;
+            }
+
+            stopCurrentVoice();
+
+            currentActiveCard = card;
+            card.classList.add("playing");
+            btn.innerHTML = "⏹ Arrêter";
+            btn.classList.add("playing");
+
+            if (currentVoice === "web_speech") {
+                // Lecture via Web Speech API du navigateur
+                if (!("speechSynthesis" in window)) {
+                    alert("Web Speech API non disponible sur ce navigateur.");
+                    stopCurrentVoice();
+                    return;
+                }
+                const utterance = new SpeechSynthesisUtterance(text);
+                const langMap = { fr: "fr-FR", en: "en-US", de: "de-DE" };
+                utterance.lang = langMap[currentLang];
+                utterance.volume = vol;
+                utterance.rate = 1.05;
+                utterance.onend = () => stopCurrentVoice();
+                utterance.onerror = () => stopCurrentVoice();
+                window.speechSynthesis.speak(utterance);
+            } else {
+                // Lecture du fichier audio Edge-TTS pré-généré
+                const url = `assets/audio/benchmark/${currentLang}/${currentVoice}/${key}.mp3`;
+                currentAudio = new Audio(url);
+                currentAudio.volume = vol;
+                currentAudio.onended = () => stopCurrentVoice();
+                currentAudio.onerror = (e) => {
+                    console.error("Erreur de chargement audio:", url, e);
+                    alert("Fichier audio non trouvé: " + url);
+                    stopCurrentVoice();
+                };
+                currentAudio.play().catch(e => {
+                    console.warn("Play error:", e);
+                    stopCurrentVoice();
+                });
+            }
+        }
+
+        function saveVoicePreferences() {
+            const pref = {
+                fr: document.getElementById("selectVoteFr").value,
+                en: document.getElementById("selectVoteEn").value,
+                de: document.getElementById("selectVoteDe").value
+            };
+            localStorage.setItem("sudoku_arena_preferred_voices", JSON.stringify(pref));
+            const toast = document.getElementById("saveToast");
+            toast.style.display = "block";
+            toast.textContent = `✅ Configuration enregistrée : FR=${pref.fr} | EN=${pref.en} | DE=${pref.de}`;
+            setTimeout(() => { toast.style.display = "none"; }, 5000);
+        }
+
+        // Init
+        document.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll(".lang-tab-btn").forEach(btn => {
+                btn.addEventListener("click", () => setLanguage(btn.dataset.lang));
+            });
+
+            // Charger les préférences existantes si disponibles
+            const saved = localStorage.getItem("sudoku_arena_preferred_voices");
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.fr) document.getElementById("selectVoteFr").value = parsed.fr;
+                    if (parsed.en) document.getElementById("selectVoteEn").value = parsed.en;
+                    if (parsed.de) document.getElementById("selectVoteDe").value = parsed.de;
+                } catch(e) {}
+            }
+
+            setLanguage("fr");
+        });
+    </script>
+</body>
+</html>

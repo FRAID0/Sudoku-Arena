@@ -24,3 +24,8 @@ Thumbs.db
 reports/
 .jenkins_venv/
 test-results.xml
+
+# Environment & Secrets
+.env
+*.env
+backend/.env

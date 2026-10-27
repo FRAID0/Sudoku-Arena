@@ -90,12 +90,12 @@ class TestRoomManagerClash(unittest.TestCase):
         # Alice a 5 points
         room.players["p1_id"].score = 5.0
 
-        # Timeout d'Alice
+        # Timeout d'Alice : score conservé (pas de pénalité sur chrono), tour passe
         res = self.manager.timeout_turn(code)
         self.assertIsNotNone(res)
         self.assertTrue(res["timeout"])
         self.assertEqual(res["timed_out_player_id"], "p1_id")
-        self.assertEqual(res["score"], 4.0)
+        self.assertEqual(res["score"], 5.0)
         self.assertEqual(res["current_turn"], "p2_id")
         self.assertEqual(room.current_turn_player_id, "p2_id")
 

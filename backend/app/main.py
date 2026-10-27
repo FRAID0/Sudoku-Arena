@@ -7,7 +7,8 @@ Gère le décompte synchronisé, le bot autonome KI FRAID et la télémétrie MQ
 import asyncio
 import json
 import os
-from typing import Dict, List
+import time
+from typing import Dict, List, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -23,6 +24,15 @@ from app.core.metrics import (
     WINS_TOTAL
 )
 from app.ai.bot import KIFraidBot
+from app.services.llm_commentator import (
+    IntroRequest,
+    DebriefRequest,
+    LiveCommentRequest,
+    CommentatorResponse,
+    commentator_service
+)
+from app.services.narrative_engine import narrative_engine
+
 
 app = FastAPI(
     title="Sudoku Arena API",
@@ -120,6 +130,45 @@ async def shutdown_event():
     await redis_manager.close()
 
 
+async def check_and_broadcast_commentary(room_code: str, player_id: str, move_res: dict, lang: Optional[str] = None):
+    """Analyse asynchrone non-bloquante du match pour interventions e-sport du Caster."""
+    room = room_manager.rooms.get(room_code)
+    if not room or move_res.get("game_over"):
+        return
+    room_lang = lang or getattr(room, "lang", "fr")
+    req = narrative_engine.evaluate_move(room, player_id, move_res, lang=room_lang)
+    if req:
+        comment = await commentator_service.generate_live_comment(req)
+        await ws_manager.broadcast(room_code, {
+            "event": "CASTER_COMMENT",
+            "comment": comment.dict()
+        })
+        publish_mqtt("game/caster", {
+            "text": comment.text,
+            "mood": comment.mood,
+            "event_type": req.event_type
+        })
+
+
+async def check_and_broadcast_timeout_commentary(room_code: str, timed_out_player_id: str, lang: Optional[str] = None):
+    room = room_manager.rooms.get(room_code)
+    if not room:
+        return
+    room_lang = lang or getattr(room, "lang", "fr")
+    req = narrative_engine.evaluate_timeout(room, timed_out_player_id, lang=room_lang)
+    if req:
+        comment = await commentator_service.generate_live_comment(req)
+        await ws_manager.broadcast(room_code, {
+            "event": "CASTER_COMMENT",
+            "comment": comment.dict()
+        })
+        publish_mqtt("game/caster", {
+            "text": comment.text,
+            "mood": comment.mood,
+            "event_type": req.event_type
+        })
+
+
 async def run_ai_opponent(room_code: str, difficulty: str):
     """Boucle d'actions asynchrone du bot KI FRAID dans un salon."""
     bot = KIFraidBot(difficulty)
@@ -159,6 +208,8 @@ async def run_ai_opponent(room_code: str, difficulty: str):
             "result": res
         })
 
+        asyncio.create_task(check_and_broadcast_commentary(room_code, ai_id, res))
+
         if res.get("valid"):
             publish_mqtt("game/led", {"state": "green", "source": "bot"})
         else:
@@ -184,6 +235,7 @@ async def monitor_turn_timer(room_code: str):
             if elapsed >= room.turn_timeout:
                 timeout_res = room_manager.timeout_turn(room_code)
                 if timeout_res:
+                    asyncio.create_task(check_and_broadcast_timeout_commentary(room_code, timeout_res.get("timed_out_player_id")))
                     await ws_manager.broadcast(room_code, {
                         "event": "TURN_TIMEOUT",
                         "result": timeout_res
@@ -205,6 +257,7 @@ async def start_game_flow(room_code: str):
         await asyncio.sleep(1)
 
     room = room_manager.start_game(room_code)
+    narrative_engine.reset_room(room_code)
     GAMES_STARTED_TOTAL.labels(mode=room.mode.value, difficulty=room.difficulty).inc()
 
     if redis_manager and redis_manager.is_connected:
@@ -234,6 +287,7 @@ class CreateRoomRequest(BaseModel):
     difficulty: str = "medium"
     validation_mode: str = "simple"  # "simple" (règles locales) ou "strict" (solution finale unique)
     clash_rule: str = "combo_capped"  # "strict", "combo_capped" (défaut), ou "unlimited"
+    lang: str = "fr"  # "fr", "en", ou "de"
 
 
 @app.get("/health")
@@ -245,6 +299,35 @@ async def health_check():
         "redis_connected": redis_manager.is_connected if redis_manager else False,
         "active_rooms": len(room_manager.rooms)
     }
+
+
+@app.get("/api/commentator/health")
+async def commentator_health():
+    """Vérifie l'état du commentateur IA KI FRAID (Gemini + Fallback)."""
+    return {
+        "status": "ready",
+        "gemini_available": commentator_service.is_gemini_available(),
+        "fallback_ready": True,
+        "supported_languages": ["fr", "en", "de"]
+    }
+
+
+@app.post("/api/commentator/intro", response_model=CommentatorResponse)
+async def commentator_intro(req: IntroRequest):
+    """Génère l'annonce d'avant-match avec pseudos réels, mode et règles."""
+    return await commentator_service.generate_intro(req)
+
+
+@app.post("/api/commentator/debrief", response_model=CommentatorResponse)
+async def commentator_debrief(req: DebriefRequest):
+    """Génère le débriefing d'après-match e-sport basé sur les statistiques du serveur."""
+    return await commentator_service.generate_debrief(req)
+
+
+@app.post("/api/commentator/live", response_model=CommentatorResponse)
+async def commentator_live(req: LiveCommentRequest):
+    """Génère une intervention de commentateur e-sport à chaud selon un événement dramatique."""
+    return await commentator_service.generate_live_comment(req)
 
 
 @app.post("/api/rooms")
@@ -265,7 +348,8 @@ async def create_room(req: CreateRoomRequest):
         mode=mode,
         difficulty=req.difficulty,
         validation_mode=req.validation_mode,
-        clash_rule=clash_rule
+        clash_rule=clash_rule,
+        lang=req.lang
     )
     ACTIVE_ROOMS.set(len(room_manager.rooms))
 
@@ -278,6 +362,7 @@ async def create_room(req: CreateRoomRequest):
         "difficulty": room.difficulty,
         "validation_mode": room.validation_mode,
         "clash_rule": room.clash_rule.value,
+        "lang": room.lang,
         "initial_puzzle": room.initial_puzzle
     }
 
@@ -316,10 +401,12 @@ async def get_room(room_code: str):
 
 
 @app.websocket("/ws/{room_code}/{player_id}/{player_name}")
-async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: str, player_name: str):
+async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: str, player_name: str, lang: Optional[str] = None):
     code = room_code.upper()
     try:
         room, role = room_manager.join_room(code, player_id, player_name)
+        if lang and lang in ("fr", "en", "de"):
+            room.lang = lang
     except ValueError as e:
         await websocket.close(code=1008, reason=str(e))
         return
@@ -367,6 +454,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
                     "result": res
                 })
 
+                asyncio.create_task(check_and_broadcast_commentary(code, player_id, res))
+
                 if res.get("valid"):
                     publish_mqtt("game/led", {"state": "green", "player": player_id})
                 else:
@@ -391,6 +480,7 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
                             "event": "TURN_TIMEOUT",
                             "result": timeout_res
                         })
+                        asyncio.create_task(check_and_broadcast_timeout_commentary(code, timeout_res.get("timed_out_player_id")))
                         publish_mqtt("game/led", {
                             "state": "red",
                             "reason": "timeout",
