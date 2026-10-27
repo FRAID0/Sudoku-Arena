@@ -117,7 +117,29 @@ const dom = {
     modalWinnerTitle: document.getElementById("modalWinnerTitle"),
     modalWinnerDesc: document.getElementById("modalWinnerDesc"),
     btnRematch: document.getElementById("btnRematch"),
-    btnBackLobby: document.getElementById("btnBackLobby")
+    btnBackLobby: document.getElementById("btnBackLobby"),
+
+    // Command Center & Guide Modal
+    cardModeClash: document.getElementById("cardModeClash"),
+    cardModeRace: document.getElementById("cardModeRace"),
+    cardModeAi: document.getElementById("cardModeAi"),
+    disciplineCards: document.querySelectorAll(".discipline-card"),
+    paramClashRuleWrap: document.getElementById("paramClashRuleWrap"),
+    paramsRow: document.querySelector(".params-row"),
+    segValidation: document.getElementById("segValidation"),
+    segClashRule: document.getElementById("segClashRule"),
+    segDiff: document.getElementById("segDiff"),
+    labelDifficulty: document.getElementById("labelDifficulty"),
+    btnMainLaunch: document.getElementById("btnMainLaunch"),
+    launchBtnIcon: document.getElementById("launchBtnIcon"),
+    launchBtnText: document.getElementById("launchBtnText"),
+    btnOpenGuide: document.getElementById("btnOpenGuide"),
+    guideModal: document.getElementById("guideModal"),
+    btnCloseGuide: document.getElementById("btnCloseGuide"),
+    btnGuideGotIt: document.getElementById("btnGuideGotIt"),
+    btnGuideVoice: document.getElementById("btnGuideVoice"),
+    guideTabs: document.querySelectorAll(".guide-tab-btn"),
+    guideTabText: document.getElementById("guideTabText")
 };
 
 // Système de Toast de Notification (Non intrusif)
@@ -688,11 +710,13 @@ if (dom.validationMode && dom.validationHelp) {
     dom.validationMode.addEventListener("change", () => updateValidationHelp(dom.validationMode, dom.validationHelp));
 }
 
-// Actions du Lobby
-dom.btnCreateRoom.addEventListener("click", async () => {
+// --- Logique Arena Command Center & Gestion des Modes ---
+
+// Action de création de salon (Clash ou Course)
+async function createRoomGame() {
     const defaultName = window.i18n ? i18n.t("default_player_name") : "Joueur 1";
-    state.playerName = dom.playerNameInput.value.trim() || defaultName;
-    const difficulty = dom.difficultySelect.value;
+    state.playerName = (dom.playerNameInput ? dom.playerNameInput.value.trim() : "") || defaultName;
+    const difficulty = dom.difficultySelect ? dom.difficultySelect.value : "medium";
     const mode = dom.gameModeSelect ? dom.gameModeSelect.value : "clash";
     const validationMode = dom.validationMode ? dom.validationMode.value : "simple";
     const clashRule = (dom.clashRuleSelect && mode === "clash") ? dom.clashRuleSelect.value : "combo_capped";
@@ -742,39 +766,16 @@ dom.btnCreateRoom.addEventListener("click", async () => {
     } catch (err) {
         showToast((window.i18n ? i18n.t("toast_error_create_room") : "Erreur lors de la création du salon : ") + err, "error");
     }
-});
+}
 
-dom.btnJoinRoom.addEventListener("click", () => {
-    const code = dom.joinCodeInput.value.trim().toUpperCase();
-    if (code.length !== 4) {
-        showToast(window.i18n ? i18n.t("toast_invalid_code") : "Code à 4 lettres invalide.", "error");
-        return;
-    }
-    const defaultName = window.i18n ? i18n.t("default_player_2") : "Joueur 2";
-    state.playerName = dom.playerNameInput.value.trim() || defaultName;
-    state.roomCode = code;
-    state.isHost = false;
-
-    dom.displayRoomCode.textContent = state.roomCode;
-    const meTag = window.i18n ? i18n.t("player_me_tag") : "(Moi)";
-    dom.p1Name.textContent = `${state.playerName} ${meTag}`;
-
-    dom.lobbySection.classList.add("hidden");
-    dom.gameSection.classList.remove("hidden");
-    document.body.classList.add("in-game");
-    if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
-
-    connectWebSocket(state.roomCode);
-});
-
-// Duel solo contre KI FRAID
-dom.btnPlayAi.addEventListener("click", async () => {
+// Action de duel solo contre KI FRAID
+async function startSoloAiGame() {
     const defaultName = window.i18n ? i18n.t("default_player_name") : "Joueur 1";
-    state.playerName = dom.playerNameInput.value.trim() || defaultName;
+    state.playerName = (dom.playerNameInput ? dom.playerNameInput.value.trim() : "") || defaultName;
     state.isAiMatch = true;
     state.isHost = true;
     state.mode = "solo_ai";
-    // Utilise automatiquement la difficulté et règle choisies préalablement
+
     const chosenDiff = dom.difficultySelect ? dom.difficultySelect.value : "medium";
     const validationMode = dom.validationMode ? dom.validationMode.value : "simple";
     state.difficulty = chosenDiff;
@@ -837,7 +838,250 @@ dom.btnPlayAi.addEventListener("click", async () => {
     } catch (err) {
         showToast((window.i18n ? i18n.t("toast_error_ai") : "Erreur démarrage solo IA : ") + err, "error");
     }
-});
+}
+
+// Sélecteur de Discipline E-Sport avec adaptation contextuelle
+function setDiscipline(mode) {
+    state.mode = mode;
+    if (dom.gameModeSelect) dom.gameModeSelect.value = mode;
+
+    // Mise à jour de l'état actif des cartes
+    document.querySelectorAll(".discipline-card").forEach(card => {
+        card.classList.toggle("active", card.dataset.mode === mode);
+    });
+
+    const currentLang = (window.i18n && window.i18n.currentLang) || "fr";
+
+    // Adaptation du deck de paramètres
+    if (dom.paramClashRuleWrap && dom.paramsRow) {
+        if (mode === "clash") {
+            dom.paramClashRuleWrap.style.display = "";
+            dom.paramsRow.classList.remove("two-cols");
+        } else {
+            dom.paramClashRuleWrap.style.display = "none";
+            dom.paramsRow.classList.add("two-cols");
+        }
+    }
+
+    // Mise à jour du bouton d'action principal
+    if (dom.launchBtnIcon && dom.launchBtnText) {
+        if (mode === "clash") {
+            dom.launchBtnIcon.textContent = "🚀";
+            dom.launchBtnText.setAttribute("data-i18n", "btn_create_clash");
+            dom.launchBtnText.textContent = window.i18n ? i18n.t("btn_create_clash") : "Créer le Salon Clash 🚀";
+        } else if (mode === "race") {
+            dom.launchBtnIcon.textContent = "🏎️";
+            dom.launchBtnText.setAttribute("data-i18n", "btn_create_race");
+            dom.launchBtnText.textContent = window.i18n ? i18n.t("btn_create_race") : "Lancer la Course Miroir 🏎️";
+        } else if (mode === "solo_ai") {
+            dom.launchBtnIcon.textContent = "🤖";
+            dom.launchBtnText.setAttribute("data-i18n", "btn_challenge_ai");
+            dom.launchBtnText.textContent = window.i18n ? i18n.t("btn_challenge_ai") : "Défier KI FRAID 🤖";
+        }
+    }
+
+    // Mise à jour des libellés de difficulté
+    const btnEasy = document.getElementById("segDiffEasy");
+    const btnMedium = document.getElementById("segDiffMedium");
+    const btnHard = document.getElementById("segDiffHard");
+
+    if (mode === "clash") {
+        if (dom.labelDifficulty) {
+            dom.labelDifficulty.setAttribute("data-i18n", "difficulty_label");
+            dom.labelDifficulty.textContent = window.i18n ? i18n.t("difficulty_label") : "Difficulté / Chrono :";
+        }
+        if (btnEasy) btnEasy.innerHTML = `<span>${window.i18n ? i18n.t("diff_easy") : "Facile (30s)"}</span>`;
+        if (btnMedium) btnMedium.innerHTML = `<span>${window.i18n ? i18n.t("diff_medium") : "Moyen (20s)"}</span>`;
+        if (btnHard) btnHard.innerHTML = `<span>${window.i18n ? i18n.t("diff_hard") : "Difficile (10s)"}</span>`;
+    } else if (mode === "race") {
+        if (dom.labelDifficulty) {
+            dom.labelDifficulty.textContent = currentLang === "de" ? "Raster-Schwierigkeit :" : (currentLang === "en" ? "Grid Difficulty:" : "Difficulté Grille :");
+        }
+        if (btnEasy) btnEasy.innerHTML = `<span>${currentLang === "de" ? "Leicht" : (currentLang === "en" ? "Easy" : "Facile")}</span>`;
+        if (btnMedium) btnMedium.innerHTML = `<span>${currentLang === "de" ? "Mittel" : (currentLang === "en" ? "Medium" : "Moyen")}</span>`;
+        if (btnHard) btnHard.innerHTML = `<span>${currentLang === "de" ? "Schwer" : (currentLang === "en" ? "Hard" : "Difficile")}</span>`;
+    } else if (mode === "solo_ai") {
+        if (dom.labelDifficulty) {
+            dom.labelDifficulty.textContent = currentLang === "de" ? "KI-Schwierigkeitsgrad :" : (currentLang === "en" ? "AI Bot Level:" : "Niveau du Bot :");
+        }
+        if (btnEasy) btnEasy.innerHTML = `<span>${window.i18n ? i18n.t("diff_label_novice") : "Novice"}</span>`;
+        if (btnMedium) btnMedium.innerHTML = `<span>${window.i18n ? i18n.t("diff_label_tactique") : "Tactique"}</span>`;
+        if (btnHard) btnHard.innerHTML = `<span>${window.i18n ? i18n.t("diff_label_grand_maitre") : "Grand Maître"}</span>`;
+    }
+
+    // Réaction du Commentateur
+    if (window.caster) {
+        if (mode === "clash") caster.comment("MODE_CLASH");
+        else if (mode === "race") caster.comment("MODE_RACE");
+        else if (mode === "solo_ai") {
+            const aiLines = {
+                fr: "« Prêt à me défier ? Choisis bien ton niveau, je ne ferai aucun cadeau ! »",
+                en: "« Ready to challenge me? Choose your difficulty level wisely! »",
+                de: "« Bereit gegen mich anzutreten? Wähle deine Schwierigkeit mit Bedacht! »"
+            };
+            caster.displayHud(aiLines[currentLang] || aiLines.fr);
+            if (caster.isVoiceEnabled) {
+                caster.comment("VS_BOT");
+            }
+        }
+    }
+}
+
+// Initialiseur pour barres segmentées modernes
+function initSegmentedBar(containerEl, targetInputId, onValChange) {
+    if (!containerEl) return;
+    const targetInput = document.getElementById(targetInputId);
+    containerEl.querySelectorAll(".seg-item").forEach(item => {
+        item.addEventListener("click", () => {
+            containerEl.querySelectorAll(".seg-item").forEach(btn => btn.classList.remove("active"));
+            item.classList.add("active");
+            const val = item.dataset.val;
+            if (targetInput) targetInput.value = val;
+            if (onValChange) onValChange(val);
+            if (window.caster) caster.playSfx("click");
+        });
+    });
+}
+
+// Initialisation du Guide Modal Interactif
+function initTabbedGuideModal() {
+    if (!dom.guideModal) return;
+
+    const setTab = (tabName) => {
+        if (dom.guideTabs) {
+            dom.guideTabs.forEach(btn => {
+                btn.classList.toggle("active", btn.dataset.tab === tabName);
+            });
+        }
+        const textKey = "guide_" + tabName + "_text";
+        if (dom.guideTabText) {
+            dom.guideTabText.setAttribute("data-i18n", textKey);
+            dom.guideTabText.textContent = window.i18n ? i18n.t(textKey) : "";
+        }
+    };
+
+    if (dom.btnOpenGuide) {
+        dom.btnOpenGuide.addEventListener("click", () => {
+            dom.guideModal.classList.remove("hidden");
+            setTab("clash");
+            if (window.caster) caster.playSfx("click");
+        });
+    }
+
+    if (dom.btnCloseGuide) {
+        dom.btnCloseGuide.addEventListener("click", () => {
+            dom.guideModal.classList.add("hidden");
+            if (window.caster) {
+                caster.stopAllVoice();
+                caster.playSfx("click");
+            }
+        });
+    }
+
+    if (dom.btnGuideGotIt) {
+        dom.btnGuideGotIt.addEventListener("click", () => {
+            dom.guideModal.classList.add("hidden");
+            if (window.caster) {
+                caster.stopAllVoice();
+                caster.playSfx("click");
+            }
+        });
+    }
+
+    dom.guideModal.addEventListener("click", (e) => {
+        if (e.target === dom.guideModal) {
+            dom.guideModal.classList.add("hidden");
+            if (window.caster) caster.stopAllVoice();
+        }
+    });
+
+    if (dom.guideTabs) {
+        dom.guideTabs.forEach(btn => {
+            btn.addEventListener("click", () => {
+                setTab(btn.dataset.tab);
+                if (window.caster) {
+                    caster.stopAllVoice();
+                    caster.playSfx("click");
+                }
+            });
+        });
+    }
+
+    if (dom.btnGuideVoice) {
+        dom.btnGuideVoice.addEventListener("click", () => {
+            const currentLang = (window.i18n && window.i18n.currentLang) || "fr";
+            const textToSpeak = dom.guideTabText ? dom.guideTabText.textContent : "";
+            if (textToSpeak && window.caster) {
+                caster.speakWebSpeech(textToSpeak, currentLang);
+            }
+        });
+    }
+}
+
+// Initialisation globale des composants Command Center
+function initCommandCenter() {
+    // 1. Clic sur les cartes de discipline
+    document.querySelectorAll(".discipline-card").forEach(card => {
+        card.addEventListener("click", () => {
+            const mode = card.dataset.mode;
+            setDiscipline(mode);
+            if (window.caster) caster.playSfx("click");
+        });
+    });
+
+    // 2. Barres segmentées
+    initSegmentedBar(dom.segValidation, "validationMode", (val) => { state.validationMode = val; });
+    initSegmentedBar(dom.segClashRule, "clashRule", (val) => {});
+    initSegmentedBar(dom.segDiff, "gameDifficulty", (val) => { state.difficulty = val; });
+
+    // 3. Bouton Principal de Lancement
+    if (dom.btnMainLaunch) {
+        dom.btnMainLaunch.addEventListener("click", () => {
+            if (state.mode === "solo_ai") {
+                startSoloAiGame();
+            } else {
+                createRoomGame();
+            }
+        });
+    }
+
+    // 4. Guide Modal
+    initTabbedGuideModal();
+}
+
+// Actions rétro-compatibles
+if (dom.btnCreateRoom) {
+    dom.btnCreateRoom.addEventListener("click", createRoomGame);
+}
+
+if (dom.btnJoinRoom) {
+    dom.btnJoinRoom.addEventListener("click", () => {
+        const code = dom.joinCodeInput.value.trim().toUpperCase();
+        if (code.length !== 4) {
+            showToast(window.i18n ? i18n.t("toast_invalid_code") : "Code à 4 lettres invalide.", "error");
+            return;
+        }
+        const defaultName = window.i18n ? i18n.t("default_player_2") : "Joueur 2";
+        state.playerName = (dom.playerNameInput ? dom.playerNameInput.value.trim() : "") || defaultName;
+        state.roomCode = code;
+        state.isHost = false;
+
+        dom.displayRoomCode.textContent = state.roomCode;
+        const meTag = window.i18n ? i18n.t("player_me_tag") : "(Moi)";
+        dom.p1Name.textContent = `${state.playerName} ${meTag}`;
+
+        dom.lobbySection.classList.add("hidden");
+        dom.gameSection.classList.remove("hidden");
+        document.body.classList.add("in-game");
+        if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
+
+        connectWebSocket(state.roomCode);
+    });
+}
+
+if (dom.btnPlayAi) {
+    dom.btnPlayAi.addEventListener("click", startSoloAiGame);
+}
 
 dom.btnStartGame.addEventListener("click", () => {
     if (state.socket) {
@@ -955,6 +1199,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     ? (window.i18n ? i18n.t("voice_on") : "Voix activée") 
                     : (window.i18n ? i18n.t("voice_off") : "Voix coupée");
             }
+
+            // Rafraîchir les libellés dynamiques du Command Center
+            setDiscipline(state.mode || "clash");
         });
 
     // 2. Initialiser le pupitre de KI FRAID Caster
@@ -968,24 +1215,13 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 3. Masquer/Afficher les règles de Clash selon le mode choisi et expliquer le mode
-    if (dom.gameModeSelect && dom.clashRuleGroup) {
-        dom.gameModeSelect.addEventListener("change", () => {
-            const isClash = (dom.gameModeSelect.value === "clash");
-            if (isClash) {
-                dom.clashRuleGroup.classList.remove("hidden");
-            } else {
-                dom.clashRuleGroup.classList.add("hidden");
-            }
-            if (window.caster) {
-                caster.comment(isClash ? "MODE_CLASH" : "MODE_RACE");
-            }
-        });
-    }
+    // 3. Initialiser le Command Center E-Sport & Guide Modal
+    initCommandCenter();
 
     // 4. Salutation de bienvenue du Commentateur
     setTimeout(() => {
         if (window.caster) caster.comment("WELCOME");
     }, 600);
 });
+
 

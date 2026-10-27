@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Outfit:wght@300;400;600;800;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
     <!-- GSAP Animation Engine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=12.0">
+    <link rel="stylesheet" href="css/style.css?v=13.0">
 </head>
 <body>
     <!-- Canvas particules de fond -->
@@ -57,83 +57,119 @@
             <div class="caster-bubble-container" id="casterSpeechBubble">
                 <p class="caster-speech-text" id="casterSpeechText">« Bienvenue dans l'arène ! Prépare tes neurones, chaque coup compte ! »</p>
             </div>
+            <button id="btnOpenGuide" class="caster-audio-toggle" title="Guide & Règles de l'Arène" aria-label="Guide">❓</button>
             <button id="btnToggleVoice" class="caster-audio-toggle" title="Activer / Couper la voix de synthèse">
                 <span id="voiceIcon">🔊</span>
             </button>
             <a href="audio-benchmark.html" class="caster-audio-toggle" style="text-decoration:none;font-size:0.9rem;" title="Banc d'Essai & Choix des Voix">🎧</a>
         </section>
 
-        <!-- Section Lobby (Création / Connexion salon) -->
-        <main id="lobbySection" class="glass-card lobby-card">
-            <h2 data-i18n="lobby_title">🕹️ REJOINDRE L'ARÈNE</h2>
-            
-            <div class="form-group">
-                <label for="playerName" data-i18n="your_name">Votre Pseudo :</label>
-                <input type="text" id="playerName" data-i18n-placeholder="pseudo_placeholder" placeholder="ex: NeoSolver" maxlength="15" value="Joueur 1">
+        <!-- Section Lobby (Arena Command Center) -->
+        <main id="lobbySection" class="glass-card lobby-card command-center">
+            <!-- Ligne Haut : Pseudo & Entrée Rapide Code Ami -->
+            <div class="command-top-bar">
+                <div class="player-identity-group">
+                    <label for="playerName" data-i18n="your_name">Votre Pseudo :</label>
+                    <input type="text" id="playerName" data-i18n-placeholder="pseudo_placeholder" placeholder="ex: NeoSolver" maxlength="15" value="Joueur 1">
+                </div>
+                <div class="quick-join-group">
+                    <label for="joinCodeInput" data-i18n="join_title">Rejoindre par Code :</label>
+                    <div class="quick-join-input-wrap">
+                        <input type="text" id="joinCodeInput" data-i18n-placeholder="join_placeholder" placeholder="CODE" maxlength="4">
+                        <button id="btnJoinRoom" class="btn btn-secondary btn-join-compact" data-i18n="btn_join">Rejoindre ⚔️</button>
+                    </div>
+                </div>
             </div>
 
-            <div class="actions-grid">
-                <!-- Créer un salon -->
-                <div class="action-box">
-                    <h3 data-i18n="create_room_title">Créer un Salon Privé</h3>
-                    <div class="select-group">
-                        <label for="gameMode" data-i18n="game_mode_label">Mode de Jeu :</label>
-                        <select id="gameMode">
-                            <option value="clash" selected data-i18n="mode_clash">⚡ Clash (Tour par Tour)</option>
-                            <option value="race" data-i18n="mode_race">🏎️ Course (Speedrun Miroir)</option>
-                        </select>
+            <!-- Choix de la Discipline E-Sport (3 Cartes Interactives) -->
+            <div class="discipline-section">
+                <span class="discipline-label" data-i18n="discipline_label">CHOISISSEZ VOTRE DISCIPLINE :</span>
+                <div class="discipline-grid">
+                    <!-- Carte 1 : Clash -->
+                    <div class="discipline-card active" data-mode="clash" id="cardModeClash">
+                        <div class="card-glow-indicator"></div>
+                        <div class="discipline-icon">⚡</div>
+                        <div class="discipline-title" data-i18n="mode_clash_title">CLASH</div>
+                        <div class="discipline-desc" data-i18n="mode_clash_desc">Duel tour par tour sur grille partagée avec combos</div>
                     </div>
-                    <div class="select-group" id="clashRuleGroup">
-                        <label for="clashRule" data-i18n="clash_rule_label">Variante de Tour (Clash) :</label>
-                        <select id="clashRule">
-                            <option value="combo_capped" selected data-i18n="clash_combo_capped">⚡ Combo x2 Limité (1 coup bonus max - Recommandé)</option>
-                            <option value="strict" data-i18n="clash_strict">🛡️ Alternance Stricte (1 coup par tour)</option>
-                            <option value="unlimited" data-i18n="clash_unlimited">🔥 Série Illimitée (Tant qu'on réussit, on joue)</option>
-                        </select>
-                    </div>
-                    <div class="select-group">
-                        <label for="validationMode" data-i18n="validation_rule_label">Règle de Validation :</label>
-                        <select id="validationMode">
-                            <option value="simple" selected data-i18n="val_simple">✨ Mode Simple (Règles locales)</option>
-                            <option value="strict" data-i18n="val_strict">🧩 Mode Casse-Tête (Solution unique)</option>
-                        </select>
-                        <span class="helper-text" id="validationHelp" data-i18n="val_help_simple">✨ Chiffres valides selon les règles Sudoku sans bloquer sur la solution finale</span>
-                    </div>
-                    <div class="select-group">
-                        <label for="gameDifficulty" data-i18n="difficulty_label">Difficulté :</label>
-                        <select id="gameDifficulty">
-                            <option value="easy" data-i18n="diff_easy">Facile (Chrono 30s)</option>
-                            <option value="medium" selected data-i18n="diff_medium">Moyen (Chrono 20s)</option>
-                            <option value="hard" data-i18n="diff_hard">Difficile (Chrono 10s)</option>
-                        </select>
-                    </div>
-                    <button id="btnCreateRoom" class="btn btn-primary" data-i18n="btn_create">Créer le Salon 🚀</button>
-                </div>
 
-                <!-- Rejoindre un salon -->
-                <div class="action-box join-box">
-                    <div>
-                        <h3 data-i18n="join_title">Rejoindre par Code</h3>
-                        <p class="action-desc" data-i18n="join_desc">Entrez le code à 4 lettres d'un ami pour rejoindre son arène multijoueur en direct.</p>
+                    <!-- Carte 2 : Course -->
+                    <div class="discipline-card" data-mode="race" id="cardModeRace">
+                        <div class="card-glow-indicator"></div>
+                        <div class="discipline-icon">🏎️</div>
+                        <div class="discipline-title" data-i18n="mode_race_title">COURSE</div>
+                        <div class="discipline-desc" data-i18n="mode_race_desc">Speedrun pur en miroir, résolvez en premier</div>
                     </div>
-                    <div class="input-inline">
-                        <input type="text" id="joinCodeInput" data-i18n-placeholder="join_placeholder" placeholder="CODE (EX: K9AF)" maxlength="4">
-                        <button id="btnJoinRoom" class="btn btn-secondary" data-i18n="btn_join">Rejoindre ⚔️</button>
+
+                    <!-- Carte 3 : Bot Rival -->
+                    <div class="discipline-card" data-mode="solo_ai" id="cardModeAi">
+                        <div class="card-glow-indicator"></div>
+                        <div class="discipline-icon">🤖</div>
+                        <div class="discipline-title" data-i18n="mode_ai_title">BOT RIVAL</div>
+                        <div class="discipline-desc" data-i18n="mode_ai_desc">Défiez l'algorithme autonome KI FRAID</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Mode Solo vs Bot Rival KI FRAID -->
-                <div class="action-box ai-box">
-                    <div class="ai-hero-card">
-                        <img src="assets/ki-fraid.jpg" alt="KI FRAID - Cyberpunk Sudoku AI" class="ai-hero-img">
-                        <div class="ai-hero-overlay">
-                            <span class="ai-status-pill" data-i18n="ai_status">⚡ BOT CYBERNÉTIQUE RIVAL</span>
-                            <h3 class="ai-hero-title" data-i18n="ai_title">Duel vs KI FRAID</h3>
-                            <p class="ai-hero-desc" data-i18n="ai_desc">Affrontez l'IA autonome. Elle s'adapte automatiquement à votre difficulté et règle.</p>
+            <!-- Paramètres Contextuels Intelligents -->
+            <div class="parameters-deck" id="parametersDeck">
+                <!-- Inputs cachés assurant la rétro-compatibilité 100% avec l'API -->
+                <input type="hidden" id="gameMode" value="clash">
+                <input type="hidden" id="clashRule" value="combo_capped">
+                <input type="hidden" id="validationMode" value="simple">
+                <input type="hidden" id="gameDifficulty" value="medium">
+
+                <div class="params-row">
+                    <!-- Règle de validation (Présente dans tous les modes) -->
+                    <div class="param-item param-validation">
+                        <label class="param-label" data-i18n="validation_rule_label">Règle de Validation :</label>
+                        <div class="segmented-bar" id="segValidation">
+                            <button type="button" class="seg-item active" data-val="simple" id="segValSimple">
+                                <span class="seg-icon">✨</span> <span data-i18n="val_simple">Mode Simple</span>
+                            </button>
+                            <button type="button" class="seg-item" data-val="strict" id="segValStrict">
+                                <span class="seg-icon">🧩</span> <span data-i18n="val_strict">Casse-Tête</span>
+                            </button>
                         </div>
                     </div>
-                    <button id="btnPlayAi" class="btn btn-ai" data-i18n="btn_play_ai">Défier KI FRAID 🤖</button>
+
+                    <!-- Variante de Tour (Uniquement en mode Clash) -->
+                    <div class="param-item param-clash-rule" id="paramClashRuleWrap">
+                        <label class="param-label" data-i18n="clash_rule_label">Variante de Tour (Clash) :</label>
+                        <div class="segmented-bar" id="segClashRule">
+                            <button type="button" class="seg-item active" data-val="combo_capped" title="1 coup bonus max">
+                                <span class="seg-icon">⚡</span> <span data-i18n="clash_combo_capped">Combo x2</span>
+                            </button>
+                            <button type="button" class="seg-item" data-val="strict" title="1 coup par tour">
+                                <span class="seg-icon">🛡️</span> <span data-i18n="clash_strict">Alternance</span>
+                            </button>
+                            <button type="button" class="seg-item" data-val="unlimited" title="Tant qu'on réussit">
+                                <span class="seg-icon">🔥</span> <span data-i18n="clash_unlimited">Série</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Difficulté / Chrono -->
+                    <div class="param-item param-diff">
+                        <label class="param-label" id="labelDifficulty" data-i18n="difficulty_label">Difficulté / Chrono :</label>
+                        <div class="segmented-bar seg-diff" id="segDiff">
+                            <button type="button" class="seg-item seg-easy" data-val="easy" id="segDiffEasy">
+                                <span data-i18n="diff_easy">Facile (30s)</span>
+                            </button>
+                            <button type="button" class="seg-item seg-medium active" data-val="medium" id="segDiffMedium">
+                                <span data-i18n="diff_medium">Moyen (20s)</span>
+                            </button>
+                            <button type="button" class="seg-item seg-hard" data-val="hard" id="segDiffHard">
+                                <span data-i18n="diff_hard">Difficile (10s)</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- Bouton d'Action Principal Unique & Imposant -->
+                <button id="btnMainLaunch" class="btn btn-primary btn-command-launch">
+                    <span id="launchBtnIcon">🚀</span> <span id="launchBtnText" data-i18n="btn_create_clash">Créer le Salon Clash 🚀</span>
+                </button>
             </div>
         </main>
 
@@ -219,6 +255,36 @@
             <div class="countdown-number" id="countdownNumber">3</div>
         </div>
 
+        <!-- Modal Guide Officiel de l'Arène (Parcours Interactif) -->
+        <div id="guideModal" class="modal-overlay hidden">
+            <div class="modal-card glass-card guide-modal-card">
+                <div class="guide-modal-header">
+                    <span class="guide-badge-pill" data-i18n="guide_badge">🎙️ GUIDE OFFICIEL DE L'ARÈNE</span>
+                    <button id="btnCloseGuide" class="btn-close-modal" aria-label="Fermer">✕</button>
+                </div>
+                
+                <!-- Onglets Interactifs des Disciplines -->
+                <div class="guide-tabs" id="guideTabs">
+                    <button type="button" class="guide-tab-btn active" data-tab="clash" data-i18n="guide_tab_clash">⚡ Clash</button>
+                    <button type="button" class="guide-tab-btn" data-tab="race" data-i18n="guide_tab_race">🏎️ Course</button>
+                    <button type="button" class="guide-tab-btn" data-tab="ai" data-i18n="guide_tab_ai">🤖 Bot Rival</button>
+                    <button type="button" class="guide-tab-btn" data-tab="rules" data-i18n="guide_tab_rules">✨ Règles</button>
+                </div>
+
+                <!-- Panneau de Contenu de l'Onglet -->
+                <div class="guide-tab-body">
+                    <p class="guide-tab-text" id="guideTabText" data-i18n="guide_clash_text">En Mode Clash, vous jouez sur la même grille au tour par tour ! Chaque coup valide rapporte des points et débloque un combo bonus. Réfléchissez vite, le chrono tourne !</p>
+                </div>
+
+                <div class="guide-modal-footer">
+                    <button id="btnGuideVoice" class="btn btn-ai btn-sm" title="Écouter l'explication">
+                        <span data-i18n="guide_btn_voice">🔊 Écouter l'explication</span>
+                    </button>
+                    <button id="btnGuideGotIt" class="btn btn-primary btn-sm" data-i18n="guide_btn_finish">J'ai compris ! 🚀</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal Fin de Partie -->
         <div id="gameOverModal" class="modal-overlay hidden">
             <div class="modal-card glass-card">
@@ -237,9 +303,9 @@
         <div id="toastNotification" class="toast-notification hidden"></div>
     </div>
 
-    <script src="js/i18n.js?v=12.0"></script>
-    <script src="js/commentator.js?v=12.0"></script>
-    <script src="js/app.js?v=12.0"></script>
-    <script src="js/animations.js?v=12.0"></script>
+    <script src="js/i18n.js?v=13.0"></script>
+    <script src="js/commentator.js?v=13.0"></script>
+    <script src="js/app.js?v=13.0"></script>
+    <script src="js/animations.js?v=13.0"></script>
 </body>
 </html>
