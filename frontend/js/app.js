@@ -1018,6 +1018,30 @@ function initTabbedGuideModal() {
     }
 }
 
+// Vocalisation pédagogique des paramètres
+function explainOption(category, val) {
+    let key = "";
+    if (category === "validation") {
+        key = val === "simple" ? "explain_val_simple" : "explain_val_strict";
+    } else if (category === "clashRule") {
+        key = "explain_clash_" + val;
+    } else if (category === "difficulty") {
+        const mode = state.mode || "clash";
+        if (mode === "clash") {
+            key = "explain_diff_clash_" + val;
+        } else if (mode === "race") {
+            key = "explain_diff_race_" + val;
+        } else if (mode === "solo_ai") {
+            key = "explain_diff_ai_" + val;
+        }
+    }
+
+    if (key && window.caster && typeof caster.explainSetting === "function") {
+        const text = window.i18n ? i18n.t(key) : "";
+        caster.explainSetting(text);
+    }
+}
+
 // Initialisation globale des composants Command Center
 function initCommandCenter() {
     // 1. Clic sur les cartes de discipline
@@ -1029,10 +1053,18 @@ function initCommandCenter() {
         });
     });
 
-    // 2. Barres segmentées
-    initSegmentedBar(dom.segValidation, "validationMode", (val) => { state.validationMode = val; });
-    initSegmentedBar(dom.segClashRule, "clashRule", (val) => {});
-    initSegmentedBar(dom.segDiff, "gameDifficulty", (val) => { state.difficulty = val; });
+    // 2. Barres segmentées avec explications vocales automatiques
+    initSegmentedBar(dom.segValidation, "validationMode", (val) => { 
+        state.validationMode = val;
+        explainOption("validation", val);
+    });
+    initSegmentedBar(dom.segClashRule, "clashRule", (val) => {
+        explainOption("clashRule", val);
+    });
+    initSegmentedBar(dom.segDiff, "gameDifficulty", (val) => { 
+        state.difficulty = val;
+        explainOption("difficulty", val);
+    });
 
     // 3. Bouton Principal de Lancement
     if (dom.btnMainLaunch) {

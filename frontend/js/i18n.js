@@ -57,6 +57,23 @@ const translations = {
         "join_placeholder": "CODE (EX: K9AF)",
         "btn_join": "Rejoindre ⚔️",
 
+        // Explications Vocales des Paramètres
+        "explain_val_simple": "Mode Simple : Tout chiffre valide selon les règles Sudoku est accepté, sans forcer la solution finale unique.",
+        "explain_val_strict": "Mode Casse-Tête : Seule l'unique solution mathématique exacte du puzzle est validée. Pour les puristes !",
+        "explain_clash_combo_capped": "Variante Combo x2 : Chaque coup correct vous donne un coup bonus immédiat. Deux coups consécutifs au maximum par tour !",
+        "explain_clash_strict": "Variante Alternance : Un seul coup par tour, bon ou faux. Aucun combo, la main passe immédiatement !",
+        "explain_clash_unlimited": "Variante Série : Vous rejouez tant que vous ne commettez aucune erreur ! Idéal pour les gros combos !",
+        "explain_diff_clash_easy": "Chrono 30 secondes : Rythme détendu pour bien analyser chaque case sans stress.",
+        "explain_diff_clash_medium": "Chrono 20 secondes : Le tempo e-sport standard. Équilibre parfait entre réflexion et rapidité !",
+        "explain_diff_clash_hard": "Chrono 10 secondes : Pression extrême ! Réflexes instantanés requis, chaque hésitation coûte cher !",
+        "explain_diff_race_easy": "Grille Facile : Nombreux indices de départ, un sprint fluide et rapide.",
+        "explain_diff_race_medium": "Grille Moyenne : Complexité équilibrée demandant des déductions croisées.",
+        "explain_diff_race_hard": "Grille Difficile : Très peu d'indices, un vrai défi de speedrun pour experts.",
+        "explain_diff_ai_easy": "Niveau Novice : L'IA prend son temps et commet parfois des erreurs de débutant.",
+        "explain_diff_ai_medium": "Niveau Tactique : L'IA joue avec précision et un bon rythme de décision.",
+        "explain_diff_ai_hard": "Niveau Grand Maître : L'IA calcule ses coups à la vitesse de l'éclair sans aucune faille !",
+
+
         // Guide Modal
         "guide_badge": "🎙️ GUIDE OFFICIEL DE L'ARÈNE",
         "guide_tab_clash": "⚡ Clash",
@@ -187,6 +204,23 @@ const translations = {
         "join_placeholder": "CODE (E.G. K9AF)",
         "btn_join": "Join ⚔️",
 
+        // Parameter Audio Explanations
+        "explain_val_simple": "Simple Mode: Any placement respecting standard Sudoku rules is accepted, without forcing the single end solution.",
+        "explain_val_strict": "Strict Puzzle Mode: Only the unique mathematical solution of the puzzle is accepted. For purists!",
+        "explain_clash_combo_capped": "Combo x2 Variant: Every correct move unlocks one immediate bonus move. Maximum two moves in a row per turn!",
+        "explain_clash_strict": "Alternation Variant: Exactly one move per turn, right or wrong. No combos, turn immediately passes!",
+        "explain_clash_unlimited": "Streak Variant: You keep playing as long as you make no mistakes! Ideal for massive combos!",
+        "explain_diff_clash_easy": "30-second Timer: Relaxed pace to carefully analyze each cell without stress.",
+        "explain_diff_clash_medium": "20-second Timer: Standard e-sport tempo. Perfect balance between thinking and speed!",
+        "explain_diff_clash_hard": "10-second Timer: Extreme pressure! Instant reflexes needed, every hesitation hurts!",
+        "explain_diff_race_easy": "Easy Grid: Plenty of starting clues, a smooth and quick sprint.",
+        "explain_diff_race_medium": "Medium Grid: Balanced complexity requiring cross-referencing techniques.",
+        "explain_diff_race_hard": "Hard Grid: Very few starting clues, a true expert speedrun test.",
+        "explain_diff_ai_easy": "Novice Level: The AI takes its time and occasionally makes beginner slips.",
+        "explain_diff_ai_medium": "Tactical Level: The AI plays accurately with solid decision-making tempo.",
+        "explain_diff_ai_hard": "Grandmaster Level: The AI computes moves at lightning speed without any flaws!",
+
+
         // Guide Modal
         "guide_badge": "🎙️ OFFICIAL ARENA GUIDE",
         "guide_tab_clash": "⚡ Clash",
@@ -316,6 +350,23 @@ const translations = {
         "join_desc": "Gib den 4-stelligen Raumcode eines Freundes ein, um dem Duell beizutreten.",
         "join_placeholder": "CODE (Z.B. K9AF)",
         "btn_join": "Beitreten ⚔️",
+
+        // Parameter Audio-Erklärungen
+        "explain_val_simple": "Einfache Regeln: Jede gültige Sudoku-Zahl wird akzeptiert, ohne die finale Endlösung zu erzwingen.",
+        "explain_val_strict": "Exakte Lösung: Nur die eindeutige mathematische Lösung des Rätsels wird gewertet. Für echte Puristen!",
+        "explain_clash_combo_capped": "Combo x2 Variante: Jeder Treffer schaltet sofort einen Bonuszug frei. Maximal zwei Züge hintereinander pro Runde!",
+        "explain_clash_strict": "Abwechselnd: Genau ein Zug pro Runde, egal ob richtig oder falsch. Keine Combos, die Reihe wechselt sofort!",
+        "explain_clash_unlimited": "Serien-Variante: Du spielst weiter, solange du keinen Fehler machst! Perfekt für riesige Combos!",
+        "explain_diff_clash_easy": "30-Sekunden-Timer: Entspanntes Tempo, um jedes Feld in aller Ruhe zu analysieren.",
+        "explain_diff_clash_medium": "20-Sekunden-Timer: Der e-Sport-Standard. Perfekte Balance aus Taktik und Tempo!",
+        "explain_diff_clash_hard": "10-Sekunden-Timer: Extremer Druck! Sofortige Reflexe nötig, jedes Zögern kostet dich den Zug!",
+        "explain_diff_race_easy": "Leichtes Raster: Viele Vorgabezahlen, ein schneller und flüssiger Sprint.",
+        "explain_diff_race_medium": "Mittleres Raster: Ausgewogene Komplexität mit logischen Kreuzableitungen.",
+        "explain_diff_race_hard": "Schweres Raster: Sehr wenige Hinweise, ein echter Speedrun-Härtetest für Experten.",
+        "explain_diff_ai_easy": "Anfänger: Die KI lässt sich Zeit und macht gelegentlich typische Anfängerfehler.",
+        "explain_diff_ai_medium": "Taktik: Die KI spielt präzise mit einem zügigen Entscheidungstempo.",
+        "explain_diff_ai_hard": "Grossmeister: Die KI berechnet ihre Züge blitzschnell und absolut fehlerfrei!",
+
 
         // Guide Modal
         "guide_badge": "🎙️ OFFIZIELLE ARENA-ANLEITUNG",

@@ -401,6 +401,18 @@ class KIFraidCaster {
         }
     }
 
+    /**
+     * Vocalise et affiche une explication pédagogique d'un paramètre ou d'une option
+     */
+    explainSetting(text) {
+        if (!text) return;
+        const lang = (window.i18n && window.i18n.currentLang) || "fr";
+        this.displayHud(text);
+        if (this.isVoiceEnabled) {
+            this.speakWebSpeech(text, lang, { rate: 1.08 });
+        }
+    }
+
     displayHud(text) {
         const casterBubble = document.getElementById("casterSpeechBubble");
         const casterText = document.getElementById("casterSpeechText");
