@@ -359,6 +359,9 @@ class KIFraidCaster {
             if (resp.ok) {
                 const data = await resp.json();
                 this.displayHud(data.text);
+                if (typeof ctx.onDebriefReady === "function") {
+                    ctx.onDebriefReady(data.text);
+                }
 
                 if (this.isVoiceEnabled) {
                     if (data.source === "gemini") {

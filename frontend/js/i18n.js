@@ -148,7 +148,22 @@ const translations = {
         "modal_winner_desc": "Vous avez complété la grille en premier avec brio !",
         "modal_loser_desc": "L'adversaire a remporté la manche. Préparez votre revanche !",
         "btn_rematch": "Revanche Immédiate 🔄",
-        "btn_lobby": "Retour au Lobby"
+        "btn_lobby": "Retour au Lobby",
+
+        // Post-Game E-Sport Debrief Card
+        "stat_time": "DURÉE",
+        "stat_accuracy": "PRÉCISION",
+        "stat_max_combo": "MAX COMBO",
+        "stat_errors": "FAUTES",
+        "debrief_caster_title": "🎙️ DÉBRIEFING DE KI FRAID CASTER",
+        "btn_share_card": "Copier le Bilan 📋",
+        "card_copied_toast": "📋 Bilan du match copié dans le presse-papier !",
+        "badge_combo_master": "🏆 MAÎTRE DU COMBO",
+        "badge_speedrunner": "⚡ SPEEDRUNNER D'ÉLITE",
+        "badge_precision": "🧠 PRÉCISION CHIRURGICALE",
+        "badge_champion": "👑 CHAMPION DE L'ARÈNE",
+        "badge_resilience": "🛡️ TÉNACITÉ DE FER",
+        "replay_audio_title": "Réécouter le débriefing"
     },
 
     en: {
@@ -295,7 +310,22 @@ const translations = {
         "modal_winner_desc": "You completed the grid first with stellar skill!",
         "modal_loser_desc": "Opponent took the round. Ready for a rematch?",
         "btn_rematch": "Instant Rematch 🔄",
-        "btn_lobby": "Back to Lobby"
+        "btn_lobby": "Back to Lobby",
+
+        // Post-Game E-Sport Debrief Card
+        "stat_time": "TIME",
+        "stat_accuracy": "ACCURACY",
+        "stat_max_combo": "MAX COMBO",
+        "stat_errors": "ERRORS",
+        "debrief_caster_title": "🎙️ KI FRAID CASTER DEBRIEF",
+        "btn_share_card": "Copy Report 📋",
+        "card_copied_toast": "📋 Match report copied to clipboard!",
+        "badge_combo_master": "🏆 COMBO MASTER",
+        "badge_speedrunner": "⚡ ELITE SPEEDRUNNER",
+        "badge_precision": "🧠 SURGICAL PRECISION",
+        "badge_champion": "👑 ARENA CHAMPION",
+        "badge_resilience": "🛡️ IRON RESILIENCE",
+        "replay_audio_title": "Replay debriefing voice"
     },
 
     de: {
@@ -442,7 +472,22 @@ const translations = {
         "modal_winner_desc": "Du hast das Raster zuerst und meisterhaft gelöst!",
         "modal_loser_desc": "Der Gegner holt sich diese Runde. Bereit für eine Revanche?",
         "btn_rematch": "Sofortige Revanche 🔄",
-        "btn_lobby": "Zurück zur Lobby"
+        "btn_lobby": "Zurück zur Lobby",
+
+        // Post-Game E-Sport Debrief Card
+        "stat_time": "DAUER",
+        "stat_accuracy": "GENAUIGKEIT",
+        "stat_max_combo": "MAX COMBO",
+        "stat_errors": "FEHLER",
+        "debrief_caster_title": "🎙️ KI FRAID CASTER ANALYSE",
+        "btn_share_card": "Bericht kopieren 📋",
+        "card_copied_toast": "📋 Spielbericht in die Zwischenablage kopiert!",
+        "badge_combo_master": "🏆 COMBO-MEISTER",
+        "badge_speedrunner": "⚡ ELITE-SPEEDRUNNER",
+        "badge_precision": "🧠 CHIRURGISCHE PRÄZISION",
+        "badge_champion": "👑 ARENA-CHAMPION",
+        "badge_resilience": "🛡️ EISERNER WILLE",
+        "replay_audio_title": "Analyse nochmals anhören"
     }
 };
 

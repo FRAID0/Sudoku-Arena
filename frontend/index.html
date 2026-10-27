@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Outfit:wght@300;400;600;800;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
     <!-- GSAP Animation Engine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=14.1">
+    <link rel="stylesheet" href="css/style.css?v=15.0">
 </head>
 <body>
     <!-- Canvas particules de fond -->
@@ -284,18 +284,68 @@
                 </div>
             </div>
         </div>
+        <!-- Trigger de test Débriefing -->
+        <button id="btnDebugGameOver" style="position:fixed;bottom:0;left:0;opacity:0.01;pointer-events:auto;z-index:9999;width:10px;height:10px;" onclick="if(window.showGameOver)window.showGameOver(true)"></button>
 
-        <!-- Modal Fin de Partie -->
+        <!-- Modal Fin de Partie (Carte Débriefing E-Sport) -->
         <div id="gameOverModal" class="modal-overlay hidden">
-            <div class="modal-card glass-card">
-                <h2 id="modalWinnerTitle" class="neon-accent" data-i18n="victory_title">VICTOIRE ! 🏆</h2>
-                <p id="modalWinnerDesc" data-i18n="modal_winner_desc">Vous avez complété la grille en premier avec brio !</p>
-                <div class="modal-stats" id="modalStats">
-                    <!-- Stats injectées -->
+            <div class="modal-card glass-card post-game-card">
+                <!-- En-tête : Titre & Badge E-Sport -->
+                <div class="post-game-header">
+                    <h2 id="modalWinnerTitle" class="neon-accent" data-i18n="victory_title">VICTOIRE ! 🏆</h2>
+                    <div class="post-game-badge" id="postGameBadge">🏆 MAÎTRE DU COMBO</div>
                 </div>
-                <div class="modal-actions">
-                    <button id="btnRematch" class="btn btn-primary" data-i18n="btn_rematch">Revanche Immédiate 🔄</button>
-                    <button id="btnBackLobby" class="btn btn-secondary" data-i18n="btn_lobby">Retour au Lobby</button>
+
+                <p id="modalWinnerDesc" class="post-game-desc" data-i18n="modal_winner_desc">Vous avez complété la grille en premier avec brio !</p>
+
+                <!-- Grille des 4 Statistiques Clés -->
+                <div class="post-game-stats-grid" id="postGameStatsGrid">
+                    <div class="stat-tile">
+                        <span class="stat-icon">⏱️</span>
+                        <div class="stat-meta">
+                            <span class="stat-val" id="statMatchTime">01:42</span>
+                            <span class="stat-lbl" data-i18n="stat_time">DURÉE</span>
+                        </div>
+                    </div>
+                    <div class="stat-tile">
+                        <span class="stat-icon">🎯</span>
+                        <div class="stat-meta">
+                            <span class="stat-val" id="statAccuracy">94%</span>
+                            <span class="stat-lbl" data-i18n="stat_accuracy">PRÉCISION</span>
+                        </div>
+                    </div>
+                    <div class="stat-tile">
+                        <span class="stat-icon">⚡</span>
+                        <div class="stat-meta">
+                            <span class="stat-val" id="statMaxCombo">x3</span>
+                            <span class="stat-lbl" data-i18n="stat_max_combo">MAX COMBO</span>
+                        </div>
+                    </div>
+                    <div class="stat-tile">
+                        <span class="stat-icon">❌</span>
+                        <div class="stat-meta">
+                            <span class="stat-val" id="statErrors">1</span>
+                            <span class="stat-lbl" data-i18n="stat_errors">FAUTES</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Débriefing Officiel du Caster KI FRAID -->
+                <div class="post-game-debrief-box" id="postGameDebriefBox">
+                    <div class="debrief-header">
+                        <span class="debrief-caster-name" data-i18n="debrief_caster_title">🎙️ DÉBRIEFING DE KI FRAID CASTER</span>
+                        <button id="btnReplayDebrief" class="btn-debrief-audio" title="Réécouter le débriefing">🔊</button>
+                    </div>
+                    <p class="debrief-text" id="modalDebriefText">« Une manche éclatante ! L'analyse tactique démontre une maîtrise remarquable sous pression. »</p>
+                </div>
+
+                <!-- Actions de Fin de Match -->
+                <div class="post-game-actions">
+                    <button id="btnShareCard" class="btn btn-secondary btn-sm" title="Copier le résumé du match">
+                        <span data-i18n="btn_share_card">Copier le Bilan 📋</span>
+                    </button>
+                    <button id="btnRematch" class="btn btn-primary btn-sm" data-i18n="btn_rematch">Revanche Immédiate 🔄</button>
+                    <button id="btnBackLobby" class="btn btn-secondary btn-sm" data-i18n="btn_lobby">Retour au Lobby</button>
                 </div>
             </div>
         </div>
@@ -303,9 +353,9 @@
         <div id="toastNotification" class="toast-notification hidden"></div>
     </div>
 
-    <script src="js/i18n.js?v=14.1"></script>
-    <script src="js/commentator.js?v=14.1"></script>
-    <script src="js/app.js?v=14.1"></script>
-    <script src="js/animations.js?v=14.1"></script>
+    <script src="js/i18n.js?v=15.0"></script>
+    <script src="js/commentator.js?v=15.0"></script>
+    <script src="js/app.js?v=15.0"></script>
+    <script src="js/animations.js?v=15.0"></script>
 </body>
 </html>

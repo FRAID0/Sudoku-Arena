@@ -65,7 +65,15 @@ const state = {
     timerInterval: null,
     reconnectAttempts: 0,
     maxReconnectAttempts: 5,
-    reconnectTimeout: null
+    reconnectTimeout: null,
+    // Statistiques E-Sport du match en direct
+    matchStartTime: null,
+    matchDurationSeconds: 0,
+    validMovesCount: 0,
+    errorMovesCount: 0,
+    currentComboStreak: 0,
+    maxComboStreak: 0,
+    lastDebriefText: ""
 };
 
 // Éléments du DOM
@@ -139,7 +147,17 @@ const dom = {
     btnGuideGotIt: document.getElementById("btnGuideGotIt"),
     btnGuideVoice: document.getElementById("btnGuideVoice"),
     guideTabs: document.querySelectorAll(".guide-tab-btn"),
-    guideTabText: document.getElementById("guideTabText")
+    guideTabText: document.getElementById("guideTabText"),
+
+    // Post-Game Debrief Card
+    postGameBadge: document.getElementById("postGameBadge"),
+    statMatchTime: document.getElementById("statMatchTime"),
+    statAccuracy: document.getElementById("statAccuracy"),
+    statMaxCombo: document.getElementById("statMaxCombo"),
+    statErrors: document.getElementById("statErrors"),
+    modalDebriefText: document.getElementById("modalDebriefText"),
+    btnReplayDebrief: document.getElementById("btnReplayDebrief"),
+    btnShareCard: document.getElementById("btnShareCard")
 };
 
 // Système de Toast de Notification (Non intrusif)
@@ -452,6 +470,15 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
             state.turnTimeout = msg.turn_timeout || 20.0;
             state.currentTurn = msg.current_turn;
 
+            // Réinitialiser les statistiques E-Sport du match
+            state.matchStartTime = Date.now();
+            state.matchDurationSeconds = 0;
+            state.validMovesCount = 0;
+            state.errorMovesCount = 0;
+            state.currentComboStreak = 0;
+            state.maxComboStreak = 0;
+            state.lastDebriefText = "";
+
             if (window.caster) {
                 const opponentName = (state.players && state.players.length > 1) 
                     ? state.players.find(p => p.id !== state.playerId)?.name 
@@ -505,6 +532,12 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
                 }
                 triggerLedEffect("success");
                 if (res.player_id === state.playerId) {
+                    state.validMovesCount++;
+                    state.currentComboStreak++;
+                    if (state.currentComboStreak > state.maxComboStreak) {
+                        state.maxComboStreak = state.currentComboStreak;
+                    }
+
                     if (res.is_combo) {
                         if (window.caster) caster.playSfx("combo");
                         showToast(window.i18n ? i18n.t("toast_combo_bonus") : "⚡ COMBO x2 ! Coup Bonus !", "info");
@@ -519,6 +552,10 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
                     if (window.caster) caster.playSfx("valid");
                 }
             } else {
+                if (res.player_id === state.playerId) {
+                    state.errorMovesCount++;
+                    state.currentComboStreak = 0;
+                }
                 if (cellEl) {
                     cellEl.classList.add("error-red", "error-shake");
                     setTimeout(() => cellEl.classList.remove("error-red", "error-shake"), 400);
@@ -563,22 +600,6 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
                 showGameOver(isWinner, res.winner_id === "DRAW");
                 if (window.caster) {
                     caster.playSfx(isWinner ? "victory" : "error");
-                    const opponentName = (state.players && state.players.length > 1) 
-                        ? state.players.find(p => p.id !== state.playerId)?.name 
-                        : (state.mode === "solo_ai" ? "Bot Rival KI FRAID" : "Adversaire");
-
-                    caster.commentDebrief({
-                        winner: isWinner ? state.playerName : opponentName,
-                        loser: isWinner ? opponentName : state.playerName,
-                        winnerScore: isWinner ? (res.score || 0) : 0,
-                        loserScore: isWinner ? 0 : (res.score || 0),
-                        isDraw: res.winner_id === "DRAW",
-                        totalCombos: res.is_combo ? 1 : 0,
-                        duration: 60,
-                        mode: state.mode,
-                        lang: (window.i18n && window.i18n.currentLang) || "fr",
-                        isWinner: isWinner
-                    });
                 }
             }
         } else if (msg.event === "TURN_TIMEOUT") {
@@ -680,6 +701,18 @@ function showGameOver(isWinner, isDraw = false) {
     stopTurnTimer();
     triggerLedEffect("victory");
 
+    // Calcul des statistiques réelles du match
+    const durationSec = Math.max(1, Math.round((Date.now() - (state.matchStartTime || Date.now())) / 1000));
+    state.matchDurationSeconds = durationSec;
+    const minutes = Math.floor(durationSec / 60);
+    const seconds = durationSec % 60;
+    const timeStr = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    const totalMoves = state.validMovesCount + state.errorMovesCount;
+    const accuracy = totalMoves > 0 ? Math.round((state.validMovesCount / totalMoves) * 100) : 100;
+    const maxCombo = state.maxComboStreak || (isWinner ? 1 : 0);
+    const errors = state.errorMovesCount;
+
+    // Titres & Descriptions
     if (isDraw) {
         dom.modalWinnerTitle.textContent = window.i18n ? i18n.t("draw_title") : "ÉGALITÉ ! 🤝";
         dom.modalWinnerDesc.textContent = "Score parfaitement identique à l'issue de la grille !";
@@ -688,13 +721,67 @@ function showGameOver(isWinner, isDraw = false) {
             ? (window.i18n ? i18n.t("victory_title") : "VICTOIRE ! 🏆") 
             : (window.i18n ? i18n.t("defeat_title") : "DÉFAITE ! 💥");
         dom.modalWinnerDesc.textContent = isWinner
-            ? (window.i18n ? i18n.t("modal_winner_desc") : "Félicitations, vous remportez le duel au sommet de l'arène !")
+            ? (window.i18n ? i18n.t("modal_winner_desc") : "Vous avez complété la grille en premier avec brio !")
             : (window.i18n ? i18n.t("modal_loser_desc") : "Votre adversaire s'impose sur cette manche.");
     }
+
+    // Attribution du Badge E-Sport
+    let badgeKey = "badge_resilience";
+    if (maxCombo >= 3) {
+        badgeKey = "badge_combo_master";
+    } else if (isWinner && durationSec <= 90) {
+        badgeKey = "badge_speedrunner";
+    } else if (accuracy >= 90 && totalMoves >= 3) {
+        badgeKey = "badge_precision";
+    } else if (isWinner) {
+        badgeKey = "badge_champion";
+    }
+    const badgeText = window.i18n ? i18n.t(badgeKey) : badgeKey;
+    if (dom.postGameBadge) dom.postGameBadge.textContent = badgeText;
+
+    // Injection des tuiles de statistiques
+    if (dom.statMatchTime) dom.statMatchTime.textContent = timeStr;
+    if (dom.statAccuracy) dom.statAccuracy.textContent = `${accuracy}%`;
+    if (dom.statMaxCombo) dom.statMaxCombo.textContent = `x${maxCombo}`;
+    if (dom.statErrors) dom.statErrors.textContent = errors.toString();
+
+    // Texte de débriefing par défaut en attendant l'analyse LLM
+    const opponentName = (state.players && state.players.length > 1) 
+        ? state.players.find(p => p.id !== state.playerId)?.name 
+        : (state.mode === "solo_ai" ? "Bot Rival KI FRAID" : (window.i18n ? i18n.t("p2_default") : "Adversaire"));
+
+    const defaultDebrief = isWinner 
+        ? `« Superbe victoire de ${state.playerName} ! Une intensité remarquable avec ${accuracy}% de précision et un combo max x${maxCombo} ! »`
+        : `« Victoire de ${opponentName}. Belle résistance de ${state.playerName}, prépare ta revanche immédiate ! »`;
+
+    state.lastDebriefText = defaultDebrief;
+    if (dom.modalDebriefText) dom.modalDebriefText.textContent = defaultDebrief;
+
     dom.gameOverModal.classList.remove("hidden");
     if (isWinner && window.ArenaAnimations) ArenaAnimations.celebrateVictory();
     playBeep(isWinner ? 880 : 180, 0.6);
+
+    // Débriefing vocal et textuel Caster IA
+    if (window.caster) {
+        caster.commentDebrief({
+            winner: isWinner ? state.playerName : opponentName,
+            loser: isWinner ? opponentName : state.playerName,
+            winnerScore: isWinner ? (state.validMovesCount * 100) : 0,
+            loserScore: isWinner ? 0 : (state.validMovesCount * 100),
+            isDraw: isDraw,
+            totalCombos: maxCombo,
+            duration: durationSec,
+            mode: state.mode,
+            lang: (window.i18n && window.i18n.currentLang) || "fr",
+            isWinner: isWinner,
+            onDebriefReady: (text) => {
+                state.lastDebriefText = text;
+                if (dom.modalDebriefText) dom.modalDebriefText.textContent = text;
+            }
+        });
+    }
 }
+window.showGameOver = showGameOver;
 
 // Mise à jour des explications des règles de validation
 const updateValidationHelp = (selectEl, helpEl) => {
@@ -1132,6 +1219,44 @@ dom.btnBackLobby.addEventListener("click", () => {
 dom.btnRematch.addEventListener("click", () => {
     window.location.reload();
 });
+
+if (dom.btnShareCard) {
+    dom.btnShareCard.addEventListener("click", () => {
+        const modeTitle = state.mode === "clash" ? "Mode Clash ⚡" : (state.mode === "race" ? "Mode Course 🏎️" : "Duel vs Bot 🤖");
+        const outcome = dom.modalWinnerTitle ? dom.modalWinnerTitle.textContent : "MATCH TERMINÉ";
+        const badge = dom.postGameBadge ? dom.postGameBadge.textContent : "";
+        const time = dom.statMatchTime ? dom.statMatchTime.textContent : "00:00";
+        const acc = dom.statAccuracy ? dom.statAccuracy.textContent : "100%";
+        const combo = dom.statMaxCombo ? dom.statMaxCombo.textContent : "x1";
+        const errs = dom.statErrors ? dom.statErrors.textContent : "0";
+
+        const shareText = `🎮 SUDOKU ARENA — RAPPORT DE MATCH 🏆\n` +
+            `Discipline : ${modeTitle}\n` +
+            `Résultat : ${outcome}\n` +
+            `Distinction : ${badge}\n` +
+            `⏱️ Durée : ${time} | 🎯 Précision : ${acc}\n` +
+            `⚡ Max Combo : ${combo} | ❌ Fautes : ${errs}\n` +
+            `Rejoignez l'arène : https://sudoku-arena-frontend.vercel.app`;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(shareText).then(() => {
+                showToast(window.i18n ? i18n.t("card_copied_toast") : "📋 Bilan du match copié dans le presse-papier !", "success");
+            }).catch(() => {
+                showToast("Erreur lors de la copie", "error");
+            });
+        }
+    });
+}
+
+if (dom.btnReplayDebrief) {
+    dom.btnReplayDebrief.addEventListener("click", () => {
+        const text = state.lastDebriefText || (dom.modalDebriefText ? dom.modalDebriefText.textContent : "");
+        const lang = (window.i18n && window.i18n.currentLang) || "fr";
+        if (text && window.caster) {
+            caster.speakWebSpeech(text, lang, { rate: 1.05 });
+        }
+    });
+}
 
 dom.btnErase.addEventListener("click", () => {
     if ((state.mode === "clash" || state.mode === "solo_ai") && state.currentTurn && state.currentTurn !== state.playerId) {
