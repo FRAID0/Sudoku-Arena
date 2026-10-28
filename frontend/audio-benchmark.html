@@ -489,7 +489,7 @@
     <div class="container">
         <!-- Navigation Top -->
         <header class="top-nav">
-            <a href="index.html" class="back-link">
+            <a href="index.html" class="back-link" onclick="if(window.history.length > 1) { history.back(); return false; }">
                 <span>◀</span> RETOUR À L'ARÈNE SUDOKU
             </a>
             <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--neon-cyan);">
