@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Outfit:wght@300;400;600;800;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
     <!-- GSAP Animation Engine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=26.0">
+    <link rel="stylesheet" href="css/style.css?v=28.0">
 </head>
 <body>
     <!-- Canvas particules de fond -->
@@ -62,7 +62,7 @@
                 <button id="btnToggleVoice" class="caster-audio-toggle" title="Activer / Couper la voix de synthèse">
                     <span id="voiceIcon">🔊</span>
                 </button>
-                <a href="audio-benchmark.html" class="caster-audio-toggle" style="text-decoration:none;font-size:0.9rem;" title="Banc d'Essai & Choix des Voix">🎧</a>
+                <button id="btnOpenSettings" class="caster-audio-toggle" style="font-size:0.95rem;" title="Paramètres Audio & Langue" aria-label="Paramètres">🎧</button>
                 <button id="btnOpenProfile" class="player-rank-pill" title="Profil & Rang E-Sport">
                     <span id="profileRankIcon">🥇</span> <span id="profileRankTitle">Or I</span> • <span id="profileMmrText">1000 MMR</span>
                 </button>
@@ -196,6 +196,7 @@
                     <span id="displayModeBadge" class="mode-badge">⚡ CLASH</span>
                     <span id="displaySpectatorBadge" class="spectator-badge-pill" title="Spectateurs en direct">👁️ <span id="spectatorCount">0</span></span>
                     <span id="spectatorRoleTag" class="spectator-role-tag hidden" data-i18n="spectator_role_label">MODE SPECTATEUR</span>
+                    <button id="btnGameSettings" class="btn-game-settings" title="Paramètres Audio & Langue" aria-label="Paramètres">⚙️</button>
                 </div>
 
                 <!-- Ghost Progress Bars -->
@@ -484,6 +485,82 @@
                     <div class="leaderboard-list" id="profileLeaderboardList">
                         <!-- Rempli dynamiquement depuis l'API -->
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Confirmation Quitter la Partie -->
+        <div id="quitConfirmModal" class="modal-overlay hidden">
+            <div class="modal-card glass-card quit-confirm-card">
+                <div class="quit-modal-icon">⚠️</div>
+                <h3 class="quit-modal-title" data-i18n="quit_modal_title">QUITTER LE MATCH ?</h3>
+                <p class="quit-modal-desc" data-i18n="quit_modal_desc">Voulez-vous vraiment quitter le match en cours ? Votre score et votre progression dans ce duel seront perdus.</p>
+                <div class="quit-modal-actions">
+                    <button id="btnCancelQuit" class="btn btn-secondary btn-sm" data-i18n="quit_modal_cancel">Continuer à jouer 🎮</button>
+                    <button id="btnConfirmQuit" class="btn btn-danger btn-sm" data-i18n="quit_modal_confirm">Quitter 🚪</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Paramètres Audio & Langue -->
+        <div id="settingsModal" class="modal-overlay hidden">
+            <div class="modal-card glass-card settings-modal-card">
+                <div class="settings-modal-header">
+                    <span class="settings-badge-pill" data-i18n="settings_modal_title">⚙️ PARAMÈTRES AUDIO & LANGUE</span>
+                    <button id="btnCloseSettings" class="btn-close-modal" aria-label="Fermer">✕</button>
+                </div>
+
+                <div class="settings-modal-body">
+                    <!-- Sélecteur de Langue -->
+                    <div class="settings-group">
+                        <label class="settings-group-title" data-i18n="settings_lang_label">Langue du jeu :</label>
+                        <div class="settings-lang-row">
+                            <button class="settings-lang-btn active" data-lang="fr">🇫🇷 Français</button>
+                            <button class="settings-lang-btn" data-lang="en">🇬🇧 English</button>
+                            <button class="settings-lang-btn" data-lang="de">🇩🇪 Deutsch</button>
+                        </div>
+                    </div>
+
+                    <!-- Options Audio -->
+                    <div class="settings-group">
+                        <div class="settings-toggle-row">
+                            <div>
+                                <span class="settings-label-bold" data-i18n="settings_voice_label">Voix KI FRAID Caster :</span>
+                                <span id="settingsVoiceStatus" class="settings-status-tag">Activée</span>
+                            </div>
+                            <button id="btnSettingsToggleVoice" class="btn btn-sm btn-secondary">🔊 Voix ON</button>
+                        </div>
+                        <div class="settings-slider-row">
+                            <label data-i18n="settings_volume_voice">Volume Voix :</label>
+                            <input type="range" id="settingsVoiceVolume" min="0" max="1" step="0.05" value="0.85">
+                            <span id="settingsVoiceVolValue">85%</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <div class="settings-toggle-row">
+                            <div>
+                                <span class="settings-label-bold" data-i18n="settings_sfx_label">Effets Sonores (SFX) :</span>
+                                <span id="settingsSfxStatus" class="settings-status-tag">Activés</span>
+                            </div>
+                            <button id="btnSettingsToggleSfx" class="btn btn-sm btn-secondary">🔔 SFX ON</button>
+                        </div>
+                        <div class="settings-slider-row">
+                            <label data-i18n="settings_volume_sfx">Volume SFX :</label>
+                            <input type="range" id="settingsSfxVolume" min="0" max="1" step="0.05" value="0.65">
+                            <span id="settingsSfxVolValue">65%</span>
+                        </div>
+                    </div>
+
+                    <!-- Test Vocal -->
+                    <div class="settings-test-row">
+                        <button id="btnSettingsTestVoice" class="btn btn-ai btn-sm" data-i18n="settings_test_btn">Tester la Voix 🎙️</button>
+                        <a href="audio-benchmark.html" target="_blank" class="settings-bench-link" data-i18n="settings_bench_link">Laboratoire Audio complet ↗</a>
+                    </div>
+                </div>
+
+                <div class="settings-modal-footer">
+                    <button id="btnSettingsDone" class="btn btn-primary btn-sm">Valider & Fermer ✕</button>
                 </div>
             </div>
         </div>

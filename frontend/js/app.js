@@ -206,7 +206,28 @@ const dom = {
     historyTabContent: document.getElementById("historyTabContent"),
     leaderboardTabContent: document.getElementById("leaderboardTabContent"),
     profileHistoryList: document.getElementById("profileHistoryList"),
-    profileLeaderboardList: document.getElementById("profileLeaderboardList")
+    profileLeaderboardList: document.getElementById("profileLeaderboardList"),
+
+    // Paramètres Audio & Langue
+    btnOpenSettings: document.getElementById("btnOpenSettings"),
+    btnGameSettings: document.getElementById("btnGameSettings"),
+    settingsModal: document.getElementById("settingsModal"),
+    btnCloseSettings: document.getElementById("btnCloseSettings"),
+    btnSettingsDone: document.getElementById("btnSettingsDone"),
+    btnSettingsToggleVoice: document.getElementById("btnSettingsToggleVoice"),
+    btnSettingsToggleSfx: document.getElementById("btnSettingsToggleSfx"),
+    settingsVoiceVolume: document.getElementById("settingsVoiceVolume"),
+    settingsSfxVolume: document.getElementById("settingsSfxVolume"),
+    settingsVoiceVolValue: document.getElementById("settingsVoiceVolValue"),
+    settingsSfxVolValue: document.getElementById("settingsSfxVolValue"),
+    settingsVoiceStatus: document.getElementById("settingsVoiceStatus"),
+    settingsSfxStatus: document.getElementById("settingsSfxStatus"),
+    btnSettingsTestVoice: document.getElementById("btnSettingsTestVoice"),
+
+    // Confirmation Quitter
+    quitConfirmModal: document.getElementById("quitConfirmModal"),
+    btnCancelQuit: document.getElementById("btnCancelQuit"),
+    btnConfirmQuit: document.getElementById("btnConfirmQuit")
 };
 
 // Système de Toast de Notification (Non intrusif)
@@ -1438,6 +1459,189 @@ function initTabbedGuideModal() {
     }
 }
 
+// Initialisation de la modale Paramètres Audio & Langue
+function initSettingsModal() {
+    function updateSettingsUI() {
+        if (!window.caster) return;
+        // État Voix
+        const voiceActive = caster.isVoiceEnabled;
+        if (dom.settingsVoiceStatus) {
+            dom.settingsVoiceStatus.textContent = voiceActive ? "Activée" : "Coupée";
+            dom.settingsVoiceStatus.classList.toggle("off", !voiceActive);
+        }
+        if (dom.btnSettingsToggleVoice) {
+            dom.btnSettingsToggleVoice.textContent = voiceActive ? "🔊 Voix ON" : "🔇 Voix OFF";
+        }
+        if (dom.settingsVoiceVolume) {
+            dom.settingsVoiceVolume.value = caster.voiceVolume;
+        }
+        if (dom.settingsVoiceVolValue) {
+            dom.settingsVoiceVolValue.textContent = `${Math.round(caster.voiceVolume * 100)}%`;
+        }
+
+        // État SFX
+        const sfxActive = caster.isSfxEnabled;
+        if (dom.settingsSfxStatus) {
+            dom.settingsSfxStatus.textContent = sfxActive ? "Activés" : "Coupés";
+            dom.settingsSfxStatus.classList.toggle("off", !sfxActive);
+        }
+        if (dom.btnSettingsToggleSfx) {
+            dom.btnSettingsToggleSfx.textContent = sfxActive ? "🔔 SFX ON" : "🔕 SFX OFF";
+        }
+        if (dom.settingsSfxVolume) {
+            dom.settingsSfxVolume.value = caster.sfxVolume;
+        }
+        if (dom.settingsSfxVolValue) {
+            dom.settingsSfxVolValue.textContent = `${Math.round(caster.sfxVolume * 100)}%`;
+        }
+
+        // Langue active
+        const curLang = (window.i18n && window.i18n.currentLang) || "fr";
+        document.querySelectorAll(".settings-lang-btn").forEach(btn => {
+            btn.classList.toggle("active", btn.dataset.lang === curLang);
+        });
+    }
+
+    function openSettings() {
+        if (!dom.settingsModal) return;
+        updateSettingsUI();
+        dom.settingsModal.classList.remove("hidden");
+        if (window.caster) caster.playSfx("click");
+    }
+
+    function closeSettings() {
+        if (!dom.settingsModal) return;
+        dom.settingsModal.classList.add("hidden");
+        if (window.caster) caster.playSfx("click");
+    }
+
+    if (dom.btnOpenSettings) dom.btnOpenSettings.addEventListener("click", openSettings);
+    if (dom.btnGameSettings) dom.btnGameSettings.addEventListener("click", openSettings);
+    if (dom.btnCloseSettings) dom.btnCloseSettings.addEventListener("click", closeSettings);
+    if (dom.btnSettingsDone) dom.btnSettingsDone.addEventListener("click", closeSettings);
+
+    if (dom.settingsModal) {
+        dom.settingsModal.addEventListener("click", (e) => {
+            if (e.target === dom.settingsModal) closeSettings();
+        });
+    }
+
+    // Toggle Voix
+    if (dom.btnSettingsToggleVoice) {
+        dom.btnSettingsToggleVoice.addEventListener("click", () => {
+            if (!window.caster) return;
+            const active = caster.toggleVoice();
+            if (dom.voiceIcon) dom.voiceIcon.textContent = active ? "🔊" : "🔇";
+            updateSettingsUI();
+        });
+    }
+
+    // Toggle SFX
+    if (dom.btnSettingsToggleSfx) {
+        dom.btnSettingsToggleSfx.addEventListener("click", () => {
+            if (!window.caster) return;
+            caster.isSfxEnabled = !caster.isSfxEnabled;
+            localStorage.setItem("sudoku_arena_sfx", caster.isSfxEnabled ? "true" : "false");
+            updateSettingsUI();
+            if (caster.isSfxEnabled) caster.playSfx("valid");
+        });
+    }
+
+    // Slider Volume Voix
+    if (dom.settingsVoiceVolume) {
+        dom.settingsVoiceVolume.addEventListener("input", (e) => {
+            if (!window.caster) return;
+            caster.voiceVolume = parseFloat(e.target.value);
+            localStorage.setItem("sudoku_arena_voice_volume", caster.voiceVolume);
+            if (dom.settingsVoiceVolValue) {
+                dom.settingsVoiceVolValue.textContent = `${Math.round(caster.voiceVolume * 100)}%`;
+            }
+        });
+    }
+
+    // Slider Volume SFX
+    if (dom.settingsSfxVolume) {
+        dom.settingsSfxVolume.addEventListener("input", (e) => {
+            if (!window.caster) return;
+            caster.sfxVolume = parseFloat(e.target.value);
+            localStorage.setItem("sudoku_arena_sfx_volume", caster.sfxVolume);
+            Object.values(caster.sfxAudio || {}).forEach(a => a.volume = caster.sfxVolume);
+            if (dom.settingsSfxVolValue) {
+                dom.settingsSfxVolValue.textContent = `${Math.round(caster.sfxVolume * 100)}%`;
+            }
+        });
+    }
+
+    // Boutons de Langue dans la modal
+    document.querySelectorAll(".settings-lang-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const lang = btn.dataset.lang;
+            if (window.i18n) {
+                window.i18n.setLanguage(lang);
+            }
+            document.querySelectorAll(".settings-lang-btn").forEach(b => b.classList.toggle("active", b === btn));
+            document.querySelectorAll(".lang-btn").forEach(b => b.classList.toggle("active", b.dataset.lang === lang));
+            updateSettingsUI();
+        });
+    });
+
+    // Test de la voix
+    if (dom.btnSettingsTestVoice) {
+        dom.btnSettingsTestVoice.addEventListener("click", () => {
+            if (!window.caster) return;
+            const curLang = (window.i18n && window.i18n.currentLang) || "fr";
+            const testPhrases = {
+                fr: "Test de la voix KI FRAID réussi ! Concentration maximale dans l'arène !",
+                en: "KI FRAID voice check successful! Welcome to the Arena!",
+                de: "Stimmtest für KI FRAID erfolgreich! Willkommen in der Arena!"
+            };
+            caster.speakWebSpeech(testPhrases[curLang] || testPhrases.fr, curLang);
+        });
+    }
+}
+
+// Initialisation de la modale de confirmation d'abandon
+function initQuitConfirmModal() {
+    if (dom.btnLeaveRoom) {
+        // Remplacement de l'action brutale par l'ouverture de la modal
+        dom.btnLeaveRoom.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (dom.quitConfirmModal) {
+                dom.quitConfirmModal.classList.remove("hidden");
+                if (window.caster) caster.playSfx("click");
+            } else {
+                window.location.reload();
+            }
+        });
+    }
+
+    if (dom.btnCancelQuit) {
+        dom.btnCancelQuit.addEventListener("click", () => {
+            if (dom.quitConfirmModal) dom.quitConfirmModal.classList.add("hidden");
+            if (window.caster) caster.playSfx("click");
+        });
+    }
+
+    if (dom.btnConfirmQuit) {
+        dom.btnConfirmQuit.addEventListener("click", () => {
+            if (state.socket) {
+                try {
+                    state.socket.send(JSON.stringify({ action: "LEAVE_ROOM" }));
+                } catch (e) {}
+            }
+            window.location.reload();
+        });
+    }
+
+    if (dom.quitConfirmModal) {
+        dom.quitConfirmModal.addEventListener("click", (e) => {
+            if (e.target === dom.quitConfirmModal) {
+                dom.quitConfirmModal.classList.add("hidden");
+            }
+        });
+    }
+}
+
 // Vocalisation pédagogique des paramètres
 function explainOption(category, val) {
     let key = "";
@@ -1859,9 +2063,6 @@ dom.btnStartGame.addEventListener("click", () => {
     }
 });
 
-dom.btnLeaveRoom.addEventListener("click", () => {
-    window.location.reload();
-});
 
 dom.btnBackLobby.addEventListener("click", () => {
     window.location.reload();
@@ -1973,7 +2174,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 const lang = btn.dataset.lang;
                 window.i18n.setLanguage(lang);
                 document.querySelectorAll(".lang-btn").forEach(b => b.classList.toggle("active", b === btn));
-                if (window.caster) caster.comment("WELCOME");
+                const isInGame = dom.gameSection && !dom.gameSection.classList.contains("hidden");
+                if (!isInGame && window.caster) caster.comment("WELCOME");
             });
         });
     }
@@ -2031,8 +2233,10 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // 3. Initialiser le Command Center E-Sport & Guide Modal
+    // 3. Initialiser le Command Center E-Sport, les Paramètres et les Modales
     initCommandCenter();
+    initSettingsModal();
+    initQuitConfirmModal();
     updateProfileUI();
 
     // 4. Salutation de bienvenue du Commentateur
