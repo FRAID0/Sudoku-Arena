@@ -199,6 +199,28 @@
   3. Focus visuel net avec contour néon sur la cellule active.
   4. Pavé tactile adaptatif sans débordement sur petits écrans.
 
+#### `[#23 - P1]` Banc d'Essai Audio Trilingue, Voix Caster & Refonte SFX
+- **En tant que :** Joueur et public d'arène  
+- **Je veux :** Des bruitages feutrés agréables aux oreilles et un commentateur vocal trilingue immersif sans bips stridents ni latence  
+- **Critères d'acceptation (DoD) :**
+  1. Création de `audio-benchmark.html` avec sélecteur trilingue (🇫🇷 Français, 🇬🇧 Anglais, 🇩🇪 Allemand).
+  2. Comparateur de 3 voix Edge-TTS par langue + Web Speech API de référence.
+  3. 6 catégories de phrases testées : Accueil, Règle Clash, Règle Course, Combo x2, Erreur, Victoire (54 fichiers MP3 pré-générés).
+  4. Refonte des 5 SFX en jeu : Clic doux, Accord montant C-E-G, Whoosh combo, Thud feutré erreur, Fanfare cristalline.
+  5. Contrôles de volume indépendants pour la voix et les SFX avec sauvegarde des préférences.
+  6. Statut : ✅ **TERMINÉE (Banc d'essai opérationnel)**.
+
+#### `[#24 - P1]` Intégration en Jeu : Voix HD Caster, SFX Harmoniques & Caster IA Gemini
+- **En tant que :** Joueur en plein match multijoueur ou solo vs Bot  
+- **Je veux :** Entendre des SFX cristallins à 0 ms de latence sur chaque coup et bénéficier d'annonces personnalisées d'avant-match et de débriefings e-sport dynamiques  
+- **Critères d'acceptation (DoD) :**
+  1. Remplacement de `playBeep` par les 5 SFX harmoniques feutrés (`valid_chord.wav`, `combo_burst.wav`, `error_soft.wav`, `click_soft.wav`, `victory_chime.wav`).
+  2. Intégration de 90 clips audio HD Edge-TTS (10 événements x 9 voix sur 3 langues) à 0 ms de latence.
+  3. Connexion de `commentIntro` à l'endpoint FastAPI `/api/commentator/intro` (Génération Gemini sur-mesure avec pseudos et mode + Fallback 0 ms).
+  4. Connexion de `commentDebrief` à `/api/commentator/debrief` avec les scores réels, durée et combos réussis.
+  5. Synchronisation de la bulle HUD du Caster et de l'animation d'ondes sonores (`casterVisualizer`).
+  6. Statut : ✅ **TERMINÉE & DÉPLOYÉE EN JEU**.
+
 ---
 
 ## 🏛️ Stratégie d'Architecture DevOps & Démonstration Portfolio

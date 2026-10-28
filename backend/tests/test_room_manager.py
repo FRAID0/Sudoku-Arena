@@ -4,7 +4,7 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.core.room_manager import RoomManager, RoomState, GameMode
+from app.core.room_manager import RoomManager, RoomState, GameMode, ClashRule
 from app.core.sudoku import SudokuEngine
 
 
@@ -18,11 +18,12 @@ class TestRoomManagerClash(unittest.TestCase):
         self.assertEqual(len(room.room_code), 4)
         self.assertEqual(room.state, RoomState.WAITING)
         self.assertEqual(room.mode, GameMode.CLASH)
+        self.assertEqual(room.clash_rule, ClashRule.COMBO_CAPPED)
         self.assertIn("p1_id", room.players)
         self.assertIsNotNone(room.shared_grid)
 
     def test_turn_alternation_on_mistake(self):
-        room = self.manager.create_room("p1_id", "Alice", GameMode.CLASH, "hard", validation_mode="strict")
+        room = self.manager.create_room("p1_id", "Alice", GameMode.CLASH, "hard", validation_mode="strict", clash_rule=ClashRule.STRICT)
         code = room.room_code
         self.manager.join_room(code, "p2_id", "Bob")
         self.manager.start_game(code)
@@ -89,12 +90,12 @@ class TestRoomManagerClash(unittest.TestCase):
         # Alice a 5 points
         room.players["p1_id"].score = 5.0
 
-        # Timeout d'Alice
+        # Timeout d'Alice : score conservé (pas de pénalité sur chrono), tour passe
         res = self.manager.timeout_turn(code)
         self.assertIsNotNone(res)
         self.assertTrue(res["timeout"])
         self.assertEqual(res["timed_out_player_id"], "p1_id")
-        self.assertEqual(res["score"], 4.0)
+        self.assertEqual(res["score"], 5.0)
         self.assertEqual(res["current_turn"], "p2_id")
         self.assertEqual(room.current_turn_player_id, "p2_id")
 
@@ -160,6 +161,118 @@ class TestRoomManagerClash(unittest.TestCase):
         self.assertEqual(res["left_player_id"], "p2")
         self.assertEqual(room.state, RoomState.FINISHED)
         self.assertEqual(room.winner_id, "p1")
+
+    def test_clash_combo_capped_variant(self):
+        """Option C : Un coup valide donne droit à 1 coup bonus (max 2 d'affilée), puis passage."""
+        room = self.manager.create_room("p1", "Alice", GameMode.CLASH, "medium", validation_mode="strict", clash_rule=ClashRule.COMBO_CAPPED)
+        code = room.room_code
+        self.manager.join_room(code, "p2", "Bob")
+        self.manager.start_game(code)
+
+        # Trouver deux cases vides
+        empty_cells = []
+        for r in range(9):
+            for c in range(9):
+                if room.shared_grid[r][c] == 0:
+                    empty_cells.append((r, c))
+                    if len(empty_cells) == 2:
+                        break
+            if len(empty_cells) == 2:
+                break
+
+        (r1, c1), (r2, c2) = empty_cells
+        val1 = room.solution[r1][c1]
+        val2 = room.solution[r2][c2]
+
+        # Coup 1 d'Alice (valide) -> Gagne le tour bonus (ne passe PAS la main)
+        res1 = self.manager.play_move(code, "p1", r1, c1, val1)
+        self.assertTrue(res1["valid"])
+        self.assertFalse(res1["turn_switched"])
+        self.assertTrue(res1["is_combo"])
+        self.assertEqual(res1["combo_streak"], 1)
+        self.assertEqual(room.current_turn_player_id, "p1")
+
+        # Coup 2 d'Alice (valide, 2ème d'affilée) -> Limite de combo atteinte, passe la main à Bob !
+        res2 = self.manager.play_move(code, "p1", r2, c2, val2)
+        self.assertTrue(res2["valid"])
+        self.assertTrue(res2["turn_switched"])
+        self.assertFalse(res2["is_combo"])
+        self.assertEqual(res2["combo_streak"], 2)
+        self.assertEqual(room.current_turn_player_id, "p2")
+
+    def test_clash_unlimited_variant(self):
+        """Option B : Série illimitée tant que les coups sont valides."""
+        room = self.manager.create_room("p1", "Alice", GameMode.CLASH, "medium", validation_mode="strict", clash_rule=ClashRule.UNLIMITED)
+        code = room.room_code
+        self.manager.join_room(code, "p2", "Bob")
+        self.manager.start_game(code)
+
+        empty_cells = []
+        for r in range(9):
+            for c in range(9):
+                if room.shared_grid[r][c] == 0:
+                    empty_cells.append((r, c))
+                    if len(empty_cells) == 4:
+                        break
+            if len(empty_cells) == 4:
+                break
+
+        (r1, c1), (r2, c2), (r3, c3), (r4, c4) = empty_cells
+
+        # Coups 1, 2, 3 consécutifs valides -> Alice garde la main
+        for i, (r, c) in enumerate([(r1, c1), (r2, c2), (r3, c3)], start=1):
+            res = self.manager.play_move(code, "p1", r, c, room.solution[r][c])
+            self.assertTrue(res["valid"])
+            self.assertFalse(res["turn_switched"])
+            self.assertEqual(res["combo_streak"], i)
+            self.assertEqual(room.current_turn_player_id, "p1")
+
+        # Coup 4 d'Alice invalide -> Bris de combo immédiat et la main passe à Bob !
+        wrong_val = (room.solution[r4][c4] % 9) + 1
+        res_err = self.manager.play_move(code, "p1", r4, c4, wrong_val)
+        self.assertFalse(res_err["valid"])
+        self.assertTrue(res_err["turn_switched"])
+        self.assertEqual(res_err["combo_streak"], 0)
+        self.assertEqual(room.current_turn_player_id, "p2")
+
+    def test_find_open_room_and_stats(self):
+        """Test de recherche de salon public pour le matchmaking 1-clic."""
+        # Aucun salon au départ
+        found = self.manager.find_open_room(GameMode.CLASH, "player_seeker", "medium")
+        self.assertIsNone(found)
+
+        # Création d'un salon public en attente
+        room = self.manager.create_room("host_1", "Alice", GameMode.CLASH, "medium", is_public=True, auto_start=True)
+        self.assertTrue(room.is_public)
+        self.assertTrue(room.auto_start)
+
+        # L'hôte lui-même ne doit pas être apparié avec son propre salon
+        self.assertIsNone(self.manager.find_open_room(GameMode.CLASH, "host_1", "medium"))
+
+        # Un autre joueur trouve le salon
+        found = self.manager.find_open_room(GameMode.CLASH, "player_seeker", "medium")
+        self.assertIsNotNone(found)
+        self.assertEqual(found.room_code, room.room_code)
+
+        # Vérification des statistiques de matchmaking
+        stats = self.manager.get_matchmaking_stats()
+        self.assertEqual(stats["waiting_rooms"], 1)
+        self.assertEqual(stats["in_game_rooms"], 0)
+        self.assertEqual(stats["total_players"], 1)
+
+    def test_convert_to_solo_ai(self):
+        """Test de bascule immédiate vers le mode Solo AI."""
+        room = self.manager.create_room("p1", "Alice", GameMode.CLASH, "hard", is_public=True)
+        code = room.room_code
+        self.assertEqual(room.mode, GameMode.CLASH)
+        self.assertEqual(len(room.players), 1)
+
+        # Bascule vers Solo AI
+        converted = self.manager.convert_to_solo_ai(code)
+        self.assertEqual(converted.mode, GameMode.SOLO_AI)
+        self.assertFalse(converted.is_public)
+        self.assertIn("bot_ki_fraid", converted.players)
+        self.assertEqual(len(converted.players), 2)
 
 
 if __name__ == "__main__":

@@ -20,6 +20,12 @@ class GameMode(str, Enum):
     SOLO_AI = "solo_ai"   # Solo contre KI FRAID
 
 
+class ClashRule(str, Enum):
+    STRICT = "strict"              # Option A : Alternance stricte (1 coup par tour)
+    COMBO_CAPPED = "combo_capped"  # Option C : Combo limité (max 2 coups consécutifs, défaut recommandé)
+    UNLIMITED = "unlimited"        # Option B : Série illimitée (tant qu'on valide, on garde la main)
+
+
 class RoomState(str, Enum):
     WAITING = "waiting"       # En attente d'un adversaire
     STARTING = "starting"     # Décompte 3.. 2.. 1..
@@ -45,6 +51,43 @@ TURN_TIMEOUTS = {
     'medium': 20.0,
     'hard': 10.0
 }
+
+REASON_MESSAGES = {
+    "ERR_INVALID_DATA": {
+        "fr": "Coordonnées ou valeur non numériques.",
+        "en": "Non-numeric coordinates or value.",
+        "de": "Nicht-numerische Koordinaten oder Werte."
+    },
+    "ERR_OUT_OF_BOUNDS": {
+        "fr": "Coordonnées (0-8) ou chiffre (1-9) hors limites.",
+        "en": "Coordinates (0-8) or number (1-9) out of bounds.",
+        "de": "Koordinaten (0-8) oder Zahl (1-9) außerhalb des gültigen Bereichs."
+    },
+    "ERR_NOT_YOUR_TURN": {
+        "fr": "Ce n'est pas votre tour !",
+        "en": "It is not your turn!",
+        "de": "Du bist nicht am Zug!"
+    },
+    "ERR_CELL_FILLED": {
+        "fr": "Cette case est déjà remplie.",
+        "en": "This cell is already filled.",
+        "de": "Dieses Feld ist bereits belegt."
+    },
+    "ERR_INCORRECT_SOLUTION": {
+        "fr": "Chiffre incorrect (ne correspond pas à la solution finale du casse-tête).",
+        "en": "Incorrect number (does not match the puzzle's final solution).",
+        "de": "Falsche Zahl (stimmt nicht mit der finalen Lösung des Rätsels überein)."
+    },
+    "ERR_CONFLICT": {
+        "fr": "Conflit : ce chiffre est déjà présent sur la même ligne, colonne ou bloc 3x3 !",
+        "en": "Conflict: this number is already in the same row, column, or 3x3 box!",
+        "de": "Konflikt: Diese Zahl existiert bereits in derselben Zeile, Spalte oder im 3x3-Block!"
+    }
+}
+
+def get_localized_reason(code: str, lang: str = "fr") -> str:
+    lang_pack = REASON_MESSAGES.get(code, {})
+    return lang_pack.get(lang, lang_pack.get("fr", code))
 
 
 class Player:
@@ -88,11 +131,20 @@ class Player:
 
 
 class Room:
-    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple"):
+    def __init__(self, room_code: str, host: Player, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED, lang: str = "fr"):
         self.room_code = room_code
         self.mode = mode
         self.difficulty = difficulty.lower() if difficulty.lower() in POINTS else "medium"
         self.validation_mode = validation_mode.lower() if validation_mode.lower() in ("simple", "strict") else "simple"
+        self.lang = lang.lower() if lang.lower() in ("fr", "en", "de") else "fr"
+        if isinstance(clash_rule, ClashRule):
+            self.clash_rule = clash_rule
+        else:
+            try:
+                self.clash_rule = ClashRule(str(clash_rule).lower())
+            except ValueError:
+                self.clash_rule = ClashRule.COMBO_CAPPED
+        self.current_combo_streak: int = 0
         self.state = RoomState.WAITING
         self.created_at = time.time()
         self.start_time: Optional[float] = None
@@ -112,12 +164,19 @@ class Room:
         self.solution: Optional[Grid] = None
         self.shared_grid: Optional[Grid] = None
 
+        # Matchmaking public & auto-lancement
+        self.is_public: bool = True
+        self.auto_start: bool = False
+
     def to_dict(self) -> dict:
         return {
             "room_code": self.room_code,
             "mode": self.mode.value if isinstance(self.mode, GameMode) else str(self.mode),
             "difficulty": self.difficulty,
             "validation_mode": self.validation_mode,
+            "clash_rule": self.clash_rule.value if isinstance(self.clash_rule, ClashRule) else str(self.clash_rule),
+            "lang": self.lang,
+            "current_combo_streak": self.current_combo_streak,
             "state": self.state.value if isinstance(self.state, RoomState) else str(self.state),
             "created_at": self.created_at,
             "start_time": self.start_time,
@@ -130,7 +189,9 @@ class Room:
             "turn_timeout": self.turn_timeout,
             "initial_puzzle": self.initial_puzzle,
             "solution": self.solution,
-            "shared_grid": self.shared_grid
+            "shared_grid": self.shared_grid,
+            "is_public": self.is_public,
+            "auto_start": self.auto_start
         }
 
     @classmethod
@@ -152,13 +213,22 @@ class Room:
         except ValueError:
             mode = GameMode.CLASH
 
+        clash_rule_val = data.get("clash_rule", ClashRule.COMBO_CAPPED)
+        try:
+            clash_rule = ClashRule(clash_rule_val)
+        except ValueError:
+            clash_rule = ClashRule.COMBO_CAPPED
+
         room = cls(
             room_code=data["room_code"],
             host=host_p,
             mode=mode,
             difficulty=data.get("difficulty", "medium"),
-            validation_mode=data.get("validation_mode", "simple")
+            validation_mode=data.get("validation_mode", "simple"),
+            clash_rule=clash_rule,
+            lang=data.get("lang", "fr")
         )
+        room.current_combo_streak = int(data.get("current_combo_streak", 0))
         state_val = data.get("state", "waiting")
         try:
             room.state = RoomState(state_val)
@@ -177,6 +247,8 @@ class Room:
         room.initial_puzzle = data.get("initial_puzzle")
         room.solution = data.get("solution")
         room.shared_grid = data.get("shared_grid")
+        room.is_public = data.get("is_public", True)
+        room.auto_start = data.get("auto_start", False)
         return room
 
     @property
@@ -201,12 +273,13 @@ class Room:
         return round((filled / empty_initial) * 100.0, 1)
 
     def switch_turn(self) -> str:
-        """Passe la main au joueur suivant et réinitialise le chrono de tour."""
+        """Passe la main au joueur suivant et réinitialise le chrono et la série de combo."""
         players = self.player_list
         if len(players) >= 2:
             current_idx = next((i for i, p in enumerate(players) if p.player_id == self.current_turn_player_id), 0)
             next_idx = (current_idx + 1) % len(players)
             self.current_turn_player_id = players[next_idx].player_id
+        self.current_combo_streak = 0
         self.turn_start_time = time.time()
         return self.current_turn_player_id
 
@@ -236,10 +309,16 @@ class RoomManager:
                 return code
         raise RuntimeError("Impossible de générer un code de salon unique")
 
-    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple") -> Room:
+    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED, lang: str = "fr", is_public: bool = True, auto_start: bool = False) -> Room:
         code = self._generate_unique_code()
+        default_names = {"fr": "Joueur 1", "en": "Player 1", "de": "Spieler 1"}
+        if not host_name or not host_name.strip() or host_name.strip() in ("Joueur 1", "Player 1", "Spieler 1"):
+            host_name = default_names.get(lang, "Joueur 1")
+
         host = Player(player_id=host_id, name=host_name, is_host=True)
-        room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty, validation_mode=validation_mode)
+        room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty, validation_mode=validation_mode, clash_rule=clash_rule, lang=lang)
+        room.is_public = is_public
+        room.auto_start = auto_start
 
         # Générer le puzzle
         puzzle, solution = SudokuEngine.generate_puzzle(difficulty)
@@ -250,7 +329,9 @@ class RoomManager:
 
         # Si mode Solo AI, inscrire automatiquement le bot comme Joueur 2
         if mode == GameMode.SOLO_AI:
-            bot_player = Player(player_id="bot_ki_fraid", name="KI FRAID 🤖", is_host=False)
+            bot_names = {"fr": "IA FRAID 🤖", "en": "AI FRAID 🤖", "de": "KI FRAID 🤖"}
+            bot_name = bot_names.get(room.lang, "IA FRAID 🤖")
+            bot_player = Player(player_id="bot_ki_fraid", name=bot_name, is_host=False)
             bot_player.grid = copy.deepcopy(puzzle)
             room.players[bot_player.player_id] = bot_player
 
@@ -262,6 +343,10 @@ class RoomManager:
         room = self.rooms.get(code)
         if not room:
             raise ValueError(f"Salon '{code}' introuvable.")
+
+        default_p2 = {"fr": "Joueur 2", "en": "Player 2", "de": "Spieler 2"}
+        if not player_name or not player_name.strip() or player_name.strip() in ("Joueur 2", "Player 2", "Spieler 2", "Challenger"):
+            player_name = default_p2.get(room.lang, "Joueur 2")
 
         if player_id in room.players:
             room.players[player_id].is_connected = True
@@ -285,6 +370,7 @@ class RoomManager:
         room.state = RoomState.IN_GAME
         room.start_time = time.time()
         room.turn_start_time = time.time()
+        room.current_combo_streak = 0
         # Le premier joueur actif est l'hôte
         room.current_turn_player_id = room.player_list[0].player_id
         return room
@@ -292,7 +378,10 @@ class RoomManager:
     def play_move(self, room_code: str, player_id: str, row: int, col: int, value: int) -> Dict:
         """
         Valide et applique un coup soumis par un joueur avec arbitrage du tour et du score.
-        Supporte deux modes : 'simple' (règles locales) et 'strict' (solution finale unique).
+        Supporte deux modes de validation ('simple' et 'strict') et 3 variantes de tour Clash :
+        - STRICT : 1 coup par tour obligatoire (alternance stricte)
+        - COMBO_CAPPED : max 2 coups consécutifs par joueur si valide (recommandé par défaut)
+        - UNLIMITED : le joueur garde la main tant qu'il réussit ses coups
         """
         room = self.rooms.get(room_code)
         if not room:
@@ -308,10 +397,20 @@ class RoomManager:
         try:
             row, col, value = int(row), int(col), int(value)
         except (ValueError, TypeError):
-            return {"valid": False, "rejected": True, "reason": "Coordonnées ou valeur non numériques."}
+            return {
+                "valid": False,
+                "rejected": True,
+                "reason_code": "ERR_INVALID_DATA",
+                "reason": get_localized_reason("ERR_INVALID_DATA", room.lang)
+            }
 
         if not (0 <= row < 9 and 0 <= col < 9 and 1 <= value <= 9):
-            return {"valid": False, "rejected": True, "reason": "Coordonnées (0-8) ou chiffre (1-9) hors limites."}
+            return {
+                "valid": False,
+                "rejected": True,
+                "reason_code": "ERR_OUT_OF_BOUNDS",
+                "reason": get_localized_reason("ERR_OUT_OF_BOUNDS", room.lang)
+            }
 
         # En mode Clash ou Solo AI : vérifier impérativement si c'est son tour
         if room.mode in (GameMode.CLASH, GameMode.SOLO_AI):
@@ -319,7 +418,8 @@ class RoomManager:
                 return {
                     "valid": False,
                     "rejected": True,
-                    "reason": "Ce n'est pas votre tour !",
+                    "reason_code": "ERR_NOT_YOUR_TURN",
+                    "reason": get_localized_reason("ERR_NOT_YOUR_TURN", room.lang),
                     "current_turn": room.current_turn_player_id
                 }
 
@@ -327,7 +427,12 @@ class RoomManager:
 
         # Case déjà remplie
         if target_grid[row][col] != 0:
-            return {"valid": False, "rejected": True, "reason": "Cette case est déjà remplie."}
+            return {
+                "valid": False,
+                "rejected": True,
+                "reason_code": "ERR_CELL_FILLED",
+                "reason": get_localized_reason("ERR_CELL_FILLED", room.lang)
+            }
 
         time_taken = time.time() - (room.turn_start_time or time.time())
 
@@ -336,10 +441,12 @@ class RoomManager:
         # - Mode 'simple' (Règles locales) : doit respecter la ligne, la colonne et le bloc 3x3 actuel
         if room.validation_mode == "strict":
             is_valid = SudokuEngine.validate_move(room.solution, row, col, value)
-            error_reason = "Chiffre incorrect (ne correspond pas à la solution finale du casse-tête)."
+            error_code = "ERR_INCORRECT_SOLUTION"
+            error_reason = get_localized_reason(error_code, room.lang)
         else:
             is_valid = SudokuEngine.is_valid_placement(target_grid, row, col, value)
-            error_reason = "Conflit : ce chiffre est déjà présent sur la même ligne, colonne ou bloc 3x3 !"
+            error_code = "ERR_CONFLICT"
+            error_reason = get_localized_reason(error_code, room.lang)
 
         if is_valid:
             target_grid[row][col] = value
@@ -348,8 +455,37 @@ class RoomManager:
             player.score += points_gained
             player.progress = room.calculate_progress(target_grid)
 
-            # En mode Clash/Solo AI, chaque coup joué passe la main pour un vrai duel interactif tour par tour
-            next_player = room.switch_turn() if room.mode in (GameMode.CLASH, GameMode.SOLO_AI) else room.current_turn_player_id
+            # Gestion de l'alternance et des combos selon la variante Clash choisie :
+            if room.mode in (GameMode.CLASH, GameMode.SOLO_AI):
+                room.current_combo_streak += 1
+                streak_recorded = room.current_combo_streak
+                if room.clash_rule == ClashRule.STRICT:
+                    # Option A : Alternance stricte systématique (1 coup par tour)
+                    next_player = room.switch_turn()
+                    turn_switched = True
+                    is_combo = False
+                elif room.clash_rule == ClashRule.UNLIMITED:
+                    # Option B : Série illimitée (tant qu'on valide, on garde la main)
+                    next_player = room.current_turn_player_id
+                    room.turn_start_time = time.time()
+                    turn_switched = False
+                    is_combo = (streak_recorded > 1)
+                else:
+                    # Option C (Défaut : COMBO_CAPPED) : Max 2 coups consécutifs
+                    if streak_recorded < 2:
+                        next_player = room.current_turn_player_id
+                        room.turn_start_time = time.time()
+                        turn_switched = False
+                        is_combo = True
+                    else:
+                        next_player = room.switch_turn()
+                        turn_switched = True
+                        is_combo = False
+            else:
+                streak_recorded = 0
+                next_player = room.current_turn_player_id
+                turn_switched = False
+                is_combo = False
 
             # Vérifier si la grille est totalement complétée
             is_completed = (player.progress >= 100.0) or all(cell != 0 for r in target_grid for cell in r)
@@ -373,15 +509,19 @@ class RoomManager:
                 "bonus_gained": bonus_pts,
                 "progress": player.progress,
                 "current_turn": next_player,
-                "turn_switched": (room.mode in (GameMode.CLASH, GameMode.SOLO_AI)),
+                "turn_switched": turn_switched,
+                "combo_streak": streak_recorded,
+                "is_combo": is_combo,
+                "clash_rule": room.clash_rule.value,
                 "shared_grid": target_grid,
                 "game_over": room.state == RoomState.FINISHED,
                 "winner_id": room.winner_id
             }
         else:
-            # ERREUR : pénalité de 1 point et PASSAGE DE TOUR IMMÉDIAT
+            # ERREUR : pénalité de 1 point, bris de combo et passage de tour immédiat
             player.mistakes += 1
             player.score = max(0.0, player.score - 1.0)
+            room.current_combo_streak = 0
             next_player = room.switch_turn() if room.mode in (GameMode.CLASH, GameMode.SOLO_AI) else room.current_turn_player_id
 
             return {
@@ -393,8 +533,12 @@ class RoomManager:
                 "score": player.score,
                 "mistakes": player.mistakes,
                 "current_turn": next_player,
-                "turn_switched": True,
+                "turn_switched": (room.mode in (GameMode.CLASH, GameMode.SOLO_AI)),
+                "combo_streak": 0,
+                "is_combo": False,
+                "clash_rule": room.clash_rule.value,
                 "game_over": False,
+                "reason_code": error_code,
                 "reason": error_reason
             }
 
@@ -405,16 +549,17 @@ class RoomManager:
             return None
 
         current_player = room.players.get(room.current_turn_player_id)
-        if current_player:
-            current_player.score = max(0.0, current_player.score - 1.0)
-            current_player.mistakes += 1
-
+        # Timeout ne déduit plus de pénalité : on conserve les points acquis.
+        # La seule pénalité s'applique lors d'un mouvement invalide.
+        room.current_combo_streak = 0
         next_player = room.switch_turn()
         return {
             "timeout": True,
             "timed_out_player_id": current_player.player_id if current_player else None,
             "score": current_player.score if current_player else 0.0,
-            "current_turn": next_player
+            "current_turn": next_player,
+            "combo_streak": 0,
+            "turn_switched": True
         }
 
     def leave_room(self, room_code: str, player_id: str) -> Optional[Dict]:
@@ -451,3 +596,49 @@ class RoomManager:
             room.spectators.remove(player_id)
 
         return None
+
+    def find_open_room(self, mode: GameMode, player_id: str, difficulty: Optional[str] = None) -> Optional[Room]:
+        """Trouve un salon public en attente d'un adversaire (autre que player_id)."""
+        candidates = []
+        for room in self.rooms.values():
+            if (room.is_public and
+                room.state == RoomState.WAITING and
+                not room.is_full and
+                room.mode == mode and
+                player_id not in room.players):
+                if difficulty and room.difficulty == difficulty:
+                    return room  # Correspondance exacte de difficulté
+                candidates.append(room)
+        return candidates[0] if candidates else None
+
+    def convert_to_solo_ai(self, room_code: str) -> Room:
+        """Bascule un salon d'attente en mode Solo AI immédiat en inscrivant le bot KI FRAID."""
+        room = self.rooms.get(room_code)
+        if not room:
+            raise ValueError("Salon introuvable.")
+        if room.state != RoomState.WAITING:
+            raise ValueError("Impossible de convertir une partie déjà commencée.")
+
+        room.mode = GameMode.SOLO_AI
+        room.is_public = False
+
+        if "bot_ki_fraid" not in room.players:
+            bot_names = {"fr": "IA FRAID 🤖", "en": "AI FRAID 🤖", "de": "KI FRAID 🤖"}
+            bot_name = bot_names.get(room.lang, "IA FRAID 🤖")
+            bot_player = Player(player_id="bot_ki_fraid", name=bot_name, is_host=False)
+            bot_player.grid = copy.deepcopy(room.initial_puzzle)
+            room.players[bot_player.player_id] = bot_player
+
+        return room
+
+    def get_matchmaking_stats(self) -> Dict:
+        """Retourne des statistiques globales du matchmaking pour le lobby et l'affichage temps réel."""
+        waiting_rooms = sum(1 for r in self.rooms.values() if r.state == RoomState.WAITING and r.is_public)
+        in_game_rooms = sum(1 for r in self.rooms.values() if r.state == RoomState.IN_GAME)
+        total_players = sum(len(r.players) for r in self.rooms.values())
+        return {
+            "waiting_rooms": waiting_rooms,
+            "in_game_rooms": in_game_rooms,
+            "total_players": total_players,
+            "total_rooms": len(self.rooms)
+        }

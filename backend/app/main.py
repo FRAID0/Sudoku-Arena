@@ -7,13 +7,14 @@ Gère le décompte synchronisé, le bot autonome KI FRAID et la télémétrie MQ
 import asyncio
 import json
 import os
-from typing import Dict, List
+import time
+from typing import Dict, List, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import paho.mqtt.client as mqtt
 
-from app.core.room_manager import RoomManager, GameMode, RoomState
+from app.core.room_manager import RoomManager, GameMode, RoomState, ClashRule
 from app.core.redis_manager import RedisManager
 from app.core.metrics import (
     setup_metrics,
@@ -23,6 +24,15 @@ from app.core.metrics import (
     WINS_TOTAL
 )
 from app.ai.bot import KIFraidBot
+from app.services.llm_commentator import (
+    IntroRequest,
+    DebriefRequest,
+    LiveCommentRequest,
+    CommentatorResponse,
+    commentator_service
+)
+from app.services.narrative_engine import narrative_engine
+
 
 app = FastAPI(
     title="Sudoku Arena API",
@@ -120,6 +130,45 @@ async def shutdown_event():
     await redis_manager.close()
 
 
+async def check_and_broadcast_commentary(room_code: str, player_id: str, move_res: dict, lang: Optional[str] = None):
+    """Analyse asynchrone non-bloquante du match pour interventions e-sport du Caster."""
+    room = room_manager.rooms.get(room_code)
+    if not room or move_res.get("game_over"):
+        return
+    room_lang = lang or getattr(room, "lang", "fr")
+    req = narrative_engine.evaluate_move(room, player_id, move_res, lang=room_lang)
+    if req:
+        comment = await commentator_service.generate_live_comment(req)
+        await ws_manager.broadcast(room_code, {
+            "event": "CASTER_COMMENT",
+            "comment": comment.dict()
+        })
+        publish_mqtt("game/caster", {
+            "text": comment.text,
+            "mood": comment.mood,
+            "event_type": req.event_type
+        })
+
+
+async def check_and_broadcast_timeout_commentary(room_code: str, timed_out_player_id: str, lang: Optional[str] = None):
+    room = room_manager.rooms.get(room_code)
+    if not room:
+        return
+    room_lang = lang or getattr(room, "lang", "fr")
+    req = narrative_engine.evaluate_timeout(room, timed_out_player_id, lang=room_lang)
+    if req:
+        comment = await commentator_service.generate_live_comment(req)
+        await ws_manager.broadcast(room_code, {
+            "event": "CASTER_COMMENT",
+            "comment": comment.dict()
+        })
+        publish_mqtt("game/caster", {
+            "text": comment.text,
+            "mood": comment.mood,
+            "event_type": req.event_type
+        })
+
+
 async def run_ai_opponent(room_code: str, difficulty: str):
     """Boucle d'actions asynchrone du bot KI FRAID dans un salon."""
     bot = KIFraidBot(difficulty)
@@ -159,6 +208,8 @@ async def run_ai_opponent(room_code: str, difficulty: str):
             "result": res
         })
 
+        asyncio.create_task(check_and_broadcast_commentary(room_code, ai_id, res))
+
         if res.get("valid"):
             publish_mqtt("game/led", {"state": "green", "source": "bot"})
         else:
@@ -184,6 +235,7 @@ async def monitor_turn_timer(room_code: str):
             if elapsed >= room.turn_timeout:
                 timeout_res = room_manager.timeout_turn(room_code)
                 if timeout_res:
+                    asyncio.create_task(check_and_broadcast_timeout_commentary(room_code, timeout_res.get("timed_out_player_id")))
                     await ws_manager.broadcast(room_code, {
                         "event": "TURN_TIMEOUT",
                         "result": timeout_res
@@ -205,6 +257,7 @@ async def start_game_flow(room_code: str):
         await asyncio.sleep(1)
 
     room = room_manager.start_game(room_code)
+    narrative_engine.reset_room(room_code)
     GAMES_STARTED_TOTAL.labels(mode=room.mode.value, difficulty=room.difficulty).inc()
 
     if redis_manager and redis_manager.is_connected:
@@ -233,6 +286,24 @@ class CreateRoomRequest(BaseModel):
     mode: str = "clash"
     difficulty: str = "medium"
     validation_mode: str = "simple"  # "simple" (règles locales) ou "strict" (solution finale unique)
+    clash_rule: str = "combo_capped"  # "strict", "combo_capped" (défaut), ou "unlimited"
+    lang: str = "fr"  # "fr", "en", ou "de"
+    is_public: bool = True
+    auto_start: bool = False
+
+
+class MatchmakingRequest(BaseModel):
+    player_id: str
+    player_name: str
+    mode: str = "clash"
+    difficulty: str = "medium"
+    validation_mode: str = "simple"
+    clash_rule: str = "combo_capped"
+    lang: str = "fr"
+
+
+class FallbackAiRequest(BaseModel):
+    room_code: str
 
 
 @app.get("/health")
@@ -246,6 +317,35 @@ async def health_check():
     }
 
 
+@app.get("/api/commentator/health")
+async def commentator_health():
+    """Vérifie l'état du commentateur IA KI FRAID (Gemini + Fallback)."""
+    return {
+        "status": "ready",
+        "gemini_available": commentator_service.is_gemini_available(),
+        "fallback_ready": True,
+        "supported_languages": ["fr", "en", "de"]
+    }
+
+
+@app.post("/api/commentator/intro", response_model=CommentatorResponse)
+async def commentator_intro(req: IntroRequest):
+    """Génère l'annonce d'avant-match avec pseudos réels, mode et règles."""
+    return await commentator_service.generate_intro(req)
+
+
+@app.post("/api/commentator/debrief", response_model=CommentatorResponse)
+async def commentator_debrief(req: DebriefRequest):
+    """Génère le débriefing d'après-match e-sport basé sur les statistiques du serveur."""
+    return await commentator_service.generate_debrief(req)
+
+
+@app.post("/api/commentator/live", response_model=CommentatorResponse)
+async def commentator_live(req: LiveCommentRequest):
+    """Génère une intervention de commentateur e-sport à chaud selon un événement dramatique."""
+    return await commentator_service.generate_live_comment(req)
+
+
 @app.post("/api/rooms")
 async def create_room(req: CreateRoomRequest):
     try:
@@ -253,12 +353,21 @@ async def create_room(req: CreateRoomRequest):
     except ValueError:
         mode = GameMode.RACE
 
+    try:
+        clash_rule = ClashRule(req.clash_rule.lower())
+    except (ValueError, AttributeError):
+        clash_rule = ClashRule.COMBO_CAPPED
+
     room = room_manager.create_room(
         host_id=req.host_id,
         host_name=req.host_name,
         mode=mode,
         difficulty=req.difficulty,
-        validation_mode=req.validation_mode
+        validation_mode=req.validation_mode,
+        clash_rule=clash_rule,
+        lang=req.lang,
+        is_public=req.is_public,
+        auto_start=req.auto_start
     )
     ACTIVE_ROOMS.set(len(room_manager.rooms))
 
@@ -270,8 +379,115 @@ async def create_room(req: CreateRoomRequest):
         "mode": room.mode.value,
         "difficulty": room.difficulty,
         "validation_mode": room.validation_mode,
+        "clash_rule": room.clash_rule.value,
+        "lang": room.lang,
+        "is_public": room.is_public,
+        "auto_start": room.auto_start,
         "initial_puzzle": room.initial_puzzle
     }
+
+
+@app.post("/api/matchmaking/find")
+async def find_or_create_match(req: MatchmakingRequest):
+    """Trouve un rival dans un salon public ouvert, ou crée un salon en attente avec auto-lancement."""
+    try:
+        mode = GameMode(req.mode)
+    except ValueError:
+        mode = GameMode.CLASH
+
+    try:
+        clash_rule = ClashRule(req.clash_rule.lower())
+    except (ValueError, AttributeError):
+        clash_rule = ClashRule.COMBO_CAPPED
+
+    # 1. Chercher un salon public en attente
+    existing_room = room_manager.find_open_room(mode=mode, player_id=req.player_id, difficulty=req.difficulty)
+    if existing_room:
+        return {
+            "status": "matched",
+            "room_code": existing_room.room_code,
+            "mode": existing_room.mode.value,
+            "difficulty": existing_room.difficulty,
+            "validation_mode": existing_room.validation_mode,
+            "clash_rule": existing_room.clash_rule.value,
+            "lang": existing_room.lang,
+            "is_host": False,
+            "auto_start": existing_room.auto_start
+        }
+
+    # 2. Aucun salon : créer un nouveau salon public avec auto-start
+    new_room = room_manager.create_room(
+        host_id=req.player_id,
+        host_name=req.player_name,
+        mode=mode,
+        difficulty=req.difficulty,
+        validation_mode=req.validation_mode,
+        clash_rule=clash_rule,
+        lang=req.lang,
+        is_public=True,
+        auto_start=True
+    )
+    ACTIVE_ROOMS.set(len(room_manager.rooms))
+    if redis_manager and redis_manager.is_connected:
+        await redis_manager.save_room(new_room)
+
+    return {
+        "status": "waiting",
+        "room_code": new_room.room_code,
+        "mode": new_room.mode.value,
+        "difficulty": new_room.difficulty,
+        "validation_mode": new_room.validation_mode,
+        "clash_rule": new_room.clash_rule.value,
+        "lang": new_room.lang,
+        "is_host": True,
+        "auto_start": True
+    }
+
+
+@app.post("/api/matchmaking/fallback-ai")
+async def fallback_ai(req: FallbackAiRequest):
+    """Convertit immédiatement un salon d'attente en Solo AI et lance le compte à rebours."""
+    code = req.room_code.upper().strip()
+    try:
+        room = room_manager.convert_to_solo_ai(code)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if redis_manager and redis_manager.is_connected:
+        await redis_manager.save_room(room)
+
+    await ws_manager.broadcast(code, {
+        "event": "AI_FALLBACK_TRIGGERED",
+        "room_code": code,
+        "mode": room.mode.value,
+        "players": [{"id": p.player_id, "name": p.name, "is_host": p.is_host} for p in room.player_list]
+    })
+    asyncio.create_task(start_game_flow(code))
+
+    return {
+        "status": "ai_started",
+        "room_code": code,
+        "mode": room.mode.value
+    }
+
+
+@app.get("/api/matchmaking/stats")
+async def matchmaking_stats():
+    """Fournit les statistiques de l'arène en temps réel."""
+    return room_manager.get_matchmaking_stats()
+
+
+@app.get("/api/leaderboard")
+async def get_leaderboard():
+    """Retourne le Top Classement E-Sport officiel de Sudoku Arena."""
+    return [
+        {"rank": 1, "name": "KI FRAID (Grand Maître) 🤖", "mmr": 2840, "league": "Grand Maître", "badge": "👑", "winrate": "98%"},
+        {"rank": 2, "name": "NeoSolver_99", "mmr": 2350, "league": "Diamant I", "badge": "💠", "winrate": "84%"},
+        {"rank": 3, "name": "SpeedDigit", "mmr": 2180, "league": "Diamant II", "badge": "💠", "winrate": "79%"},
+        {"rank": 4, "name": "CyberNinja", "mmr": 1920, "league": "Platine I", "badge": "💎", "winrate": "72%"},
+        {"rank": 5, "name": "MatrixClasher", "mmr": 1640, "league": "Platine III", "badge": "💎", "winrate": "65%"}
+    ]
+
 
 
 @app.get("/api/rooms/{room_code}")
@@ -290,6 +506,8 @@ async def get_room(room_code: str):
         "state": room.state.value,
         "mode": room.mode.value,
         "difficulty": room.difficulty,
+        "validation_mode": room.validation_mode,
+        "clash_rule": room.clash_rule.value,
         "players": [
             {
                 "id": p.player_id,
@@ -306,10 +524,12 @@ async def get_room(room_code: str):
 
 
 @app.websocket("/ws/{room_code}/{player_id}/{player_name}")
-async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: str, player_name: str):
+async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: str, player_name: str, lang: Optional[str] = None):
     code = room_code.upper()
     try:
         room, role = room_manager.join_room(code, player_id, player_name)
+        if lang and lang in ("fr", "en", "de"):
+            room.lang = lang
     except ValueError as e:
         await websocket.close(code=1008, reason=str(e))
         return
@@ -325,8 +545,13 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
         "player_id": player_id,
         "player_name": player_name,
         "role": role,
-        "players": [{"id": p.player_id, "name": p.name, "is_host": p.is_host} for p in room.player_list]
+        "players": [{"id": p.player_id, "name": p.name, "is_host": p.is_host} for p in room.player_list],
+        "spectators_count": len(room.spectators)
     })
+
+    # Lancement automatique immédiat si salon de matchmaking 1-clic et 2 joueurs réunis
+    if getattr(room, "auto_start", False) and len(room.players) >= 2 and room.state == RoomState.WAITING:
+        asyncio.create_task(start_game_flow(code))
 
     try:
         while True:
@@ -357,6 +582,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
                     "result": res
                 })
 
+                asyncio.create_task(check_and_broadcast_commentary(code, player_id, res))
+
                 if res.get("valid"):
                     publish_mqtt("game/led", {"state": "green", "player": player_id})
                 else:
@@ -381,11 +608,34 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
                             "event": "TURN_TIMEOUT",
                             "result": timeout_res
                         })
+                        asyncio.create_task(check_and_broadcast_timeout_commentary(code, timeout_res.get("timed_out_player_id")))
                         publish_mqtt("game/led", {
                             "state": "red",
                             "reason": "timeout",
                             "player": timeout_res.get("timed_out_player_id")
                         })
+
+            elif action == "SEND_EMOTE":
+                emote_key = data.get("emote_key", "fire")
+                await ws_manager.broadcast(code, {
+                    "event": "EMOTE_BURST",
+                    "player_id": player_id,
+                    "player_name": player_name,
+                    "role": role,
+                    "emote_key": emote_key
+                })
+                publish_mqtt("game/emote", {
+                    "room": code,
+                    "player": player_name,
+                    "emote": emote_key
+                })
+
+            elif action == "HYPE_BURST":
+                await ws_manager.broadcast(code, {
+                    "event": "HYPE_UPDATE",
+                    "player_id": player_id,
+                    "player_name": player_name
+                })
 
     except WebSocketDisconnect:
         ws_manager.disconnect(code, websocket)

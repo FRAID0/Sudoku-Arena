@@ -4,22 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sudoku Arena — Real-Time Multiplayer & AI</title>
+    <meta name="description" content="Sudoku Arena – duel multijoueur en temps réel, IA KI FRAID, commentateur officiel et classements mondiaux.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Outfit:wght@300;400;600;800;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    <!-- GSAP Animation Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <link rel="stylesheet" href="css/style.css?v=15.0">
 </head>
 <body>
+    <!-- Canvas particules de fond -->
+    <canvas id="particleCanvas"></canvas>
     <div class="arena-container">
         <!-- Bandeau LED Virtuel IoT (WS2812b NeoPixel) -->
         <header class="iot-led-station">
             <div class="led-bar-label">
                 <div class="iot-title-left">
                     <span class="pulse-dot" id="networkDot"></span>
-                    <span>IOT VIRTUAL LED MATRIX — WS2812B</span>
+                    <span data-i18n="iot_led_title">IOT VIRTUAL LED MATRIX — WS2812B</span>
+                </div>
+                <div class="lang-selector-group" id="langSelector">
+                    <button class="lang-btn active" data-lang="fr" title="Français">🇫🇷 FR</button>
+                    <button class="lang-btn" data-lang="en" title="English">🇬🇧 EN</button>
+                    <button class="lang-btn" data-lang="de" title="Deutsch">🇩🇪 DE</button>
                 </div>
                 <div class="network-badge online" id="networkBadge">
-                    <span id="networkStatusText">🟢 EN LIGNE</span>
+                    <span id="networkStatusText" data-i18n="online_status">🟢 EN LIGNE</span>
                 </div>
             </div>
             <div class="led-strip" id="ledStrip" role="region" aria-label="Bandeau LED de statut de jeu">
@@ -30,71 +40,147 @@
         <!-- Titre & Statut -->
         <div class="brand-header">
             <h1 class="glitch-title">SUDOKU <span class="neon-accent">ARENA</span></h1>
-            <p class="subtitle">POWERED BY FRAID — REAL-TIME CLOUD & IOT BATTLE</p>
+            <p class="subtitle" data-i18n="subtitle">POWERED BY FRAID — REAL-TIME CLOUD & IOT BATTLE</p>
         </div>
 
-        <!-- Section Lobby (Création / Connexion salon) -->
-        <main id="lobbySection" class="glass-card lobby-card">
-            <h2>🕹️ REJOINDRE L'ARÈNE</h2>
-            
-            <div class="form-group">
-                <label for="playerName">Votre Pseudo :</label>
-                <input type="text" id="playerName" placeholder="ex: NeoSolver" maxlength="15" value="Joueur 1">
+        <!-- Pupitre Régie / Commentateur Officiel KI FRAID Caster -->
+        <section class="caster-hud-card" id="casterHudCard" aria-label="Commentateur Officiel KI FRAID Caster">
+            <div class="caster-profile">
+                <div class="caster-avatar-ring">
+                    <span class="caster-mic-glow">🎙️</span>
+                </div>
+                <div class="caster-info">
+                    <span class="caster-name" data-i18n="caster_title">🎙️ KI FRAID CASTER</span>
+                    <span class="caster-badge-sub" data-i18n="caster_badge">COMMENTATEUR OFFICIEL DU TOURNOI</span>
+                </div>
+            </div>
+            <div class="caster-bubble-container" id="casterSpeechBubble">
+                <p class="caster-speech-text" id="casterSpeechText">« Bienvenue dans l'arène ! Prépare tes neurones, chaque coup compte ! »</p>
+            </div>
+            <button id="btnOpenGuide" class="caster-audio-toggle" title="Guide & Règles de l'Arène" aria-label="Guide">❓</button>
+            <button id="btnToggleVoice" class="caster-audio-toggle" title="Activer / Couper la voix de synthèse">
+                <span id="voiceIcon">🔊</span>
+            </button>
+            <a href="audio-benchmark.html" class="caster-audio-toggle" style="text-decoration:none;font-size:0.9rem;" title="Banc d'Essai & Choix des Voix">🎧</a>
+            <button id="btnOpenProfile" class="player-rank-pill" title="Profil & Rang E-Sport">
+                <span id="profileRankIcon">🥇</span> <span id="profileRankTitle">Or I</span> • <span id="profileMmrText">1000 MMR</span>
+            </button>
+        </section>
+
+        <!-- Section Lobby (Arena Command Center) -->
+        <main id="lobbySection" class="glass-card lobby-card command-center">
+            <!-- Ligne Haut : Pseudo & Entrée Rapide Code Ami -->
+            <div class="command-top-bar">
+                <div class="player-identity-group">
+                    <label for="playerName" data-i18n="your_name">Votre Pseudo :</label>
+                    <input type="text" id="playerName" data-i18n-placeholder="pseudo_placeholder" placeholder="ex: NeoSolver" maxlength="15" value="Joueur 1">
+                </div>
+                <div class="quick-join-group">
+                    <label for="joinCodeInput" data-i18n="join_title">Rejoindre par Code :</label>
+                    <div class="quick-join-input-wrap">
+                        <input type="text" id="joinCodeInput" data-i18n-placeholder="join_placeholder" placeholder="CODE" maxlength="4">
+                        <button id="btnJoinRoom" class="btn btn-secondary btn-join-compact" data-i18n="btn_join">Rejoindre ⚔️</button>
+                        <button id="btnSpectateRoom" class="btn btn-outline-spectate btn-join-compact" title="Observer le duel en direct" data-i18n="btn_spectate">👁️ Regarder</button>
+                    </div>
+                </div>
             </div>
 
-            <div class="actions-grid">
-                <!-- Créer un salon -->
-                <div class="action-box">
-                    <h3>Créer un Salon Privé</h3>
-                    <div class="select-group">
-                        <label for="gameMode">Mode de Jeu :</label>
-                        <select id="gameMode">
-                            <option value="clash" selected>⚡ Clash (Tour par Tour)</option>
-                            <option value="race">🏎️ Course (Speedrun Miroir)</option>
-                        </select>
+            <!-- Choix de la Discipline E-Sport (3 Cartes Interactives) -->
+            <div class="discipline-section">
+                <span class="discipline-label" data-i18n="discipline_label">CHOISISSEZ VOTRE DISCIPLINE :</span>
+                <div class="discipline-grid">
+                    <!-- Carte 1 : Clash -->
+                    <div class="discipline-card active" data-mode="clash" id="cardModeClash">
+                        <div class="card-glow-indicator"></div>
+                        <div class="discipline-icon">⚡</div>
+                        <div class="discipline-title" data-i18n="mode_clash_title">CLASH</div>
+                        <div class="discipline-desc" data-i18n="mode_clash_desc">Duel tour par tour sur grille partagée avec combos</div>
                     </div>
-                    <div class="select-group">
-                        <label for="validationMode">Règle de Validation :</label>
-                        <select id="validationMode">
-                            <option value="simple" selected>✨ Mode Simple (Règles locales)</option>
-                            <option value="strict">🧩 Mode Casse-Tête (Solution unique)</option>
-                        </select>
-                        <span class="helper-text" id="validationHelp">✨ Chiffres valides selon les règles Sudoku sans bloquer sur la solution finale</span>
-                    </div>
-                    <div class="select-group">
-                        <label for="gameDifficulty">Difficulté :</label>
-                        <select id="gameDifficulty">
-                            <option value="easy">Facile (Chrono 30s)</option>
-                            <option value="medium" selected>Moyen (Chrono 20s)</option>
-                            <option value="hard">Difficile (Chrono 10s)</option>
-                        </select>
-                    </div>
-                    <button id="btnCreateRoom" class="btn btn-primary">Créer le Salon 🚀</button>
-                </div>
 
-                <!-- Rejoindre un salon -->
-                <div class="action-box join-box">
-                    <div>
-                        <h3>Rejoindre par Code</h3>
-                        <p class="action-desc">Entrez le code à 4 lettres d'un ami pour rejoindre son arène multijoueur en direct.</p>
+                    <!-- Carte 2 : Course -->
+                    <div class="discipline-card" data-mode="race" id="cardModeRace">
+                        <div class="card-glow-indicator"></div>
+                        <div class="discipline-icon">🏎️</div>
+                        <div class="discipline-title" data-i18n="mode_race_title">COURSE</div>
+                        <div class="discipline-desc" data-i18n="mode_race_desc">Speedrun pur en miroir, résolvez en premier</div>
                     </div>
-                    <div class="input-inline">
-                        <input type="text" id="joinCodeInput" placeholder="CODE (EX: K9AF)" maxlength="4">
-                        <button id="btnJoinRoom" class="btn btn-secondary">Rejoindre ⚔️</button>
+
+                    <!-- Carte 3 : Bot Rival -->
+                    <div class="discipline-card" data-mode="solo_ai" id="cardModeAi">
+                        <div class="card-glow-indicator"></div>
+                        <div class="discipline-icon">🤖</div>
+                        <div class="discipline-title" data-i18n="mode_ai_title">BOT RIVAL</div>
+                        <div class="discipline-desc" data-i18n="mode_ai_desc">Défiez l'algorithme autonome KI FRAID</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Mode Solo vs KI FRAID -->
-                <div class="action-box ai-box">
-                    <div class="ai-hero-card">
-                        <img src="assets/ki-fraid.jpg" alt="KI FRAID - Cyberpunk Sudoku AI" class="ai-hero-img">
-                        <div class="ai-hero-overlay">
-                            <span class="ai-status-pill">⚡ BOT CYBERNÉTIQUE</span>
-                            <h3 class="ai-hero-title">Duel vs KI FRAID</h3>
-                            <p class="ai-hero-desc">Affrontez l'IA autonome. Elle s'adapte automatiquement à votre difficulté et règle.</p>
+            <!-- Paramètres Contextuels Intelligents -->
+            <div class="parameters-deck" id="parametersDeck">
+                <!-- Inputs cachés assurant la rétro-compatibilité 100% avec l'API -->
+                <input type="hidden" id="gameMode" value="clash">
+                <input type="hidden" id="clashRule" value="combo_capped">
+                <input type="hidden" id="validationMode" value="simple">
+                <input type="hidden" id="gameDifficulty" value="medium">
+
+                <div class="params-row">
+                    <!-- Règle de validation (Présente dans tous les modes) -->
+                    <div class="param-item param-validation">
+                        <label class="param-label" data-i18n="validation_rule_label">Règle de Validation :</label>
+                        <div class="segmented-bar" id="segValidation">
+                            <button type="button" class="seg-item active" data-val="simple" id="segValSimple">
+                                <span class="seg-icon">✨</span> <span data-i18n="val_simple">Mode Simple</span>
+                            </button>
+                            <button type="button" class="seg-item" data-val="strict" id="segValStrict">
+                                <span class="seg-icon">🧩</span> <span data-i18n="val_strict">Casse-Tête</span>
+                            </button>
                         </div>
                     </div>
-                    <button id="btnPlayAi" class="btn btn-ai">Défier KI FRAID 🤖</button>
+
+                    <!-- Variante de Tour (Uniquement en mode Clash) -->
+                    <div class="param-item param-clash-rule" id="paramClashRuleWrap">
+                        <label class="param-label" data-i18n="clash_rule_label">Variante de Tour (Clash) :</label>
+                        <div class="segmented-bar" id="segClashRule">
+                            <button type="button" class="seg-item active" data-val="combo_capped" title="1 coup bonus max">
+                                <span class="seg-icon">⚡</span> <span data-i18n="clash_combo_capped">Combo x2</span>
+                            </button>
+                            <button type="button" class="seg-item" data-val="strict" title="1 coup par tour">
+                                <span class="seg-icon">🛡️</span> <span data-i18n="clash_strict">Alternance</span>
+                            </button>
+                            <button type="button" class="seg-item" data-val="unlimited" title="Tant qu'on réussit">
+                                <span class="seg-icon">🔥</span> <span data-i18n="clash_unlimited">Série</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Difficulté / Chrono -->
+                    <div class="param-item param-diff">
+                        <label class="param-label" id="labelDifficulty" data-i18n="difficulty_label">Difficulté / Chrono :</label>
+                        <div class="segmented-bar seg-diff" id="segDiff">
+                            <button type="button" class="seg-item seg-easy" data-val="easy" id="segDiffEasy">
+                                <span data-i18n="diff_easy">Facile (30s)</span>
+                            </button>
+                            <button type="button" class="seg-item seg-medium active" data-val="medium" id="segDiffMedium">
+                                <span data-i18n="diff_medium">Moyen (20s)</span>
+                            </button>
+                            <button type="button" class="seg-item seg-hard" data-val="hard" id="segDiffHard">
+                                <span data-i18n="diff_hard">Difficile (10s)</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Boutons d'Action Lobby (Matchmaking 1-Clic & Salon Privé) -->
+                <div class="lobby-launch-row" id="lobbyLaunchRow">
+                    <button id="btnQuickMatch" class="btn btn-matchmaking btn-command-launch" type="button">
+                        <span class="matchmaking-pulse-icon">⚔️</span>
+                        <span id="quickMatchBtnText" data-i18n="btn_quick_match">Trouver un Rival (1-Clic) ⚡</span>
+                        <span class="quick-match-badge">LIVE</span>
+                    </button>
+                    <button id="btnMainLaunch" class="btn btn-primary btn-command-launch" type="button">
+                        <span id="launchBtnIcon">🚀</span>
+                        <span id="launchBtnText" data-i18n="btn_create_clash">Créer le Salon Clash 🚀</span>
+                    </button>
                 </div>
             </div>
         </main>
@@ -104,15 +190,17 @@
             <!-- Panneau Haut : Match Info & Barres de Progression -->
             <div class="match-bar glass-card">
                 <div class="room-badge">
-                    SALON : <span id="displayRoomCode" class="room-code-tag">----</span>
+                    <span data-i18n="room_label">SALON :</span> <span id="displayRoomCode" class="room-code-tag">----</span>
                     <span id="displayModeBadge" class="mode-badge">⚡ CLASH</span>
+                    <span id="displaySpectatorBadge" class="spectator-badge-pill" title="Spectateurs en direct">👁️ <span id="spectatorCount">0</span></span>
+                    <span id="spectatorRoleTag" class="spectator-role-tag hidden" data-i18n="spectator_role_label">MODE SPECTATEUR</span>
                 </div>
 
                 <!-- Ghost Progress Bars -->
                 <div class="players-progress-container">
                     <div class="player-progress-bar" id="p1Card">
                         <div class="player-info">
-                            <span id="p1Name" class="player-tag p1-tag">Moi</span>
+                            <span id="p1Name" class="player-tag p1-tag" data-i18n="p1_default">Moi</span>
                             <span id="p1Score">0 pts</span>
                         </div>
                         <div class="track">
@@ -122,7 +210,7 @@
 
                     <div class="player-progress-bar" id="p2Card">
                         <div class="player-info">
-                            <span id="p2Name" class="player-tag p2-tag">Adversaire</span>
+                            <span id="p2Name" class="player-tag p2-tag" data-i18n="p2_default">Adversaire</span>
                             <span id="p2Score">0 pts</span>
                         </div>
                         <div class="track">
@@ -131,12 +219,12 @@
                     </div>
                 </div>
 
-                <div class="match-status-badge" id="matchStatusText">En attente...</div>
+                <div class="match-status-badge" id="matchStatusText" data-i18n="waiting_player">En attente...</div>
 
                 <!-- Barre de Chrono par Tour (Mode Clash) -->
                 <div class="turn-timer-wrapper" id="turnTimerWrapper">
                     <div class="turn-timer-header">
-                        <span id="turnLabel" class="turn-label">⏳ À VOTRE TOUR !</span>
+                        <span id="turnLabel" class="turn-label" data-i18n="your_turn">⏳ À VOTRE TOUR !</span>
                         <span id="turnCountdown" class="turn-seconds">20s</span>
                     </div>
                     <div class="turn-timer-track">
@@ -168,11 +256,33 @@
                     </div>
 
                     <div class="board-actions">
-                        <button id="btnErase" class="btn btn-action">Effacer ⌫</button>
-                        <button id="btnStartGame" class="btn btn-primary hidden">Démarrer le Duel 🔥</button>
-                        <button id="btnLeaveRoom" class="btn btn-danger">Quitter 🚪</button>
+                        <button id="btnErase" class="btn btn-action" data-i18n="btn_erase">Effacer ⌫</button>
+                        <button id="btnStartGame" class="btn btn-primary hidden" data-i18n="btn_start">Démarrer le Duel 🔥</button>
+                        <button id="btnLeaveRoom" class="btn btn-danger" data-i18n="btn_leave">Quitter 🚪</button>
+                    </div>
+
+                    <!-- Hype Wheel & Émotes E-Sport Spectateurs/Joueurs -->
+                    <div class="emote-hype-container" id="emoteHypeContainer">
+                        <div class="hype-meter-wrapper">
+                            <span class="hype-label">🔥 HYPE</span>
+                            <div class="hype-track">
+                                <div id="hypeProgressFill" class="hype-fill" style="width: 50%"></div>
+                            </div>
+                            <span id="hypeScoreText" class="hype-pct">50%</span>
+                        </div>
+                        <div class="emote-buttons-row">
+                            <button class="btn-emote" data-emote="fire" title="Feu ! (F)">🔥</button>
+                            <button class="btn-emote" data-emote="brain" title="Galaxy Brain ! (B)">🧠</button>
+                            <button class="btn-emote" data-emote="speed" title="Speedrun Flash ! (S)">⚡</button>
+                            <button class="btn-emote" data-emote="panic" title="Panique ! (P)">😱</button>
+                            <button class="btn-emote" data-emote="gg" title="GG / Bien joué ! (G)">👏</button>
+                            <button class="btn-emote" data-emote="fraid" title="KI FRAID ! (K)">🤖</button>
+                        </div>
                     </div>
                 </div>
+
+                <!-- Couche Particules d'Émotes Flottantes -->
+                <div id="emoteParticleLayer" class="emote-particle-layer"></div>
             </div>
         </main>
 
@@ -181,23 +291,208 @@
             <div class="countdown-number" id="countdownNumber">3</div>
         </div>
 
-        <!-- Modal Fin de Partie -->
-        <div id="gameOverModal" class="modal-overlay hidden">
-            <div class="modal-card glass-card">
-                <h2 id="modalWinnerTitle" class="neon-accent">VICTOIRE ! 🏆</h2>
-                <p id="modalWinnerDesc">Vous avez complété la grille en premier.</p>
-                <div class="modal-stats" id="modalStats">
-                    <!-- Stats injectées -->
+        <!-- Modal Guide Officiel de l'Arène (Parcours Interactif) -->
+        <div id="guideModal" class="modal-overlay hidden">
+            <div class="modal-card glass-card guide-modal-card">
+                <div class="guide-modal-header">
+                    <span class="guide-badge-pill" data-i18n="guide_badge">🎙️ GUIDE OFFICIEL DE L'ARÈNE</span>
+                    <button id="btnCloseGuide" class="btn-close-modal" aria-label="Fermer">✕</button>
                 </div>
-                <div class="modal-actions">
-                    <button id="btnRematch" class="btn btn-primary">Revanche Immédiate 🔄</button>
-                    <button id="btnBackLobby" class="btn btn-secondary">Retour au Lobby</button>
+                
+                <!-- Onglets Interactifs des Disciplines -->
+                <div class="guide-tabs" id="guideTabs">
+                    <button type="button" class="guide-tab-btn active" data-tab="clash" data-i18n="guide_tab_clash">⚡ Clash</button>
+                    <button type="button" class="guide-tab-btn" data-tab="race" data-i18n="guide_tab_race">🏎️ Course</button>
+                    <button type="button" class="guide-tab-btn" data-tab="ai" data-i18n="guide_tab_ai">🤖 Bot Rival</button>
+                    <button type="button" class="guide-tab-btn" data-tab="rules" data-i18n="guide_tab_rules">✨ Règles</button>
+                </div>
+
+                <!-- Panneau de Contenu de l'Onglet -->
+                <div class="guide-tab-body">
+                    <p class="guide-tab-text" id="guideTabText" data-i18n="guide_clash_text">En Mode Clash, vous jouez sur la même grille au tour par tour ! Chaque coup valide rapporte des points et débloque un combo bonus. Réfléchissez vite, le chrono tourne !</p>
+                </div>
+
+                <div class="guide-modal-footer">
+                    <button id="btnGuideVoice" class="btn btn-ai btn-sm" title="Écouter l'explication">
+                        <span data-i18n="guide_btn_voice">🔊 Écouter l'explication</span>
+                    </button>
+                    <button id="btnGuideGotIt" class="btn btn-primary btn-sm" data-i18n="guide_btn_finish">J'ai compris ! 🚀</button>
                 </div>
             </div>
+        </div>
+        <!-- Trigger de test Débriefing -->
+        <button id="btnDebugGameOver" style="position:fixed;bottom:0;left:0;opacity:0.01;pointer-events:auto;z-index:9999;width:10px;height:10px;" onclick="if(window.showGameOver)window.showGameOver(true)"></button>
+
+        <!-- Modal Fin de Partie (Carte Débriefing E-Sport) -->
+        <div id="gameOverModal" class="modal-overlay hidden">
+            <div class="modal-card glass-card post-game-card">
+                <!-- En-tête : Titre & Badge E-Sport -->
+                <div class="post-game-header">
+                    <h2 id="modalWinnerTitle" class="neon-accent" data-i18n="victory_title">VICTOIRE ! 🏆</h2>
+                    <div class="post-game-header-badges">
+                        <span class="post-game-mmr-tag" id="postGameMmrDelta">+25 MMR 📈</span>
+                        <div class="post-game-badge" id="postGameBadge">🏆 MAÎTRE DU COMBO</div>
+                    </div>
+                </div>
+
+                <p id="modalWinnerDesc" class="post-game-desc" data-i18n="modal_winner_desc">Vous avez complété la grille en premier avec brio !</p>
+
+                <!-- Grille des 4 Statistiques Clés -->
+                <div class="post-game-stats-grid" id="postGameStatsGrid">
+                    <div class="stat-tile">
+                        <span class="stat-icon">⏱️</span>
+                        <div class="stat-meta">
+                            <span class="stat-val" id="statMatchTime">01:42</span>
+                            <span class="stat-lbl" data-i18n="stat_time">DURÉE</span>
+                        </div>
+                    </div>
+                    <div class="stat-tile">
+                        <span class="stat-icon">🎯</span>
+                        <div class="stat-meta">
+                            <span class="stat-val" id="statAccuracy">94%</span>
+                            <span class="stat-lbl" data-i18n="stat_accuracy">PRÉCISION</span>
+                        </div>
+                    </div>
+                    <div class="stat-tile">
+                        <span class="stat-icon">⚡</span>
+                        <div class="stat-meta">
+                            <span class="stat-val" id="statMaxCombo">x3</span>
+                            <span class="stat-lbl" data-i18n="stat_max_combo">MAX COMBO</span>
+                        </div>
+                    </div>
+                    <div class="stat-tile">
+                        <span class="stat-icon">❌</span>
+                        <div class="stat-meta">
+                            <span class="stat-val" id="statErrors">1</span>
+                            <span class="stat-lbl" data-i18n="stat_errors">FAUTES</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Débriefing Officiel du Caster KI FRAID -->
+                <div class="post-game-debrief-box" id="postGameDebriefBox">
+                    <div class="debrief-header">
+                        <span class="debrief-caster-name" data-i18n="debrief_caster_title">🎙️ DÉBRIEFING DE KI FRAID CASTER</span>
+                        <button id="btnReplayDebrief" class="btn-debrief-audio" title="Réécouter le débriefing">🔊</button>
+                    </div>
+                    <p class="debrief-text" id="modalDebriefText">« Une manche éclatante ! L'analyse tactique démontre une maîtrise remarquable sous pression. »</p>
+                </div>
+
+                <!-- Actions de Fin de Match -->
+                <div class="post-game-actions">
+                    <button id="btnShareCard" class="btn btn-secondary btn-sm" title="Copier le résumé du match">
+                        <span data-i18n="btn_share_card">Copier le Bilan 📋</span>
+                    </button>
+                    <button id="btnRematch" class="btn btn-primary btn-sm" data-i18n="btn_rematch">Revanche Immédiate 🔄</button>
+                    <button id="btnBackLobby" class="btn btn-secondary btn-sm" data-i18n="btn_lobby">Retour au Lobby</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Overlay Matchmaking Radar (Recherche 1-Clic) -->
+        <div id="matchmakingOverlay" class="modal-overlay hidden">
+            <div class="modal-content glass-card matchmaking-card">
+                <div class="radar-container">
+                    <div class="radar-circle radar-c1"></div>
+                    <div class="radar-circle radar-c2"></div>
+                    <div class="radar-circle radar-c3"></div>
+                    <div class="radar-scanner-sweep"></div>
+                    <div class="radar-center-icon">⚔️</div>
+                </div>
+
+                <h3 class="radar-title" data-i18n="radar_searching_title">Recherche d'un Rival en direct</h3>
+                <div class="radar-timer" id="radarTimer">00:00</div>
+                <p class="radar-subtitle" id="radarSubtitle" data-i18n="radar_searching_desc">Connexion au réseau e-sport des joueurs Sudoku Arena...</p>
+                
+                <div class="radar-stats-pill" id="radarStatsPill">
+                    <span class="live-dot"></span> <span id="radarStatsText" data-i18n="radar_stats_loading">Salons en cours : analyse...</span>
+                </div>
+
+                <!-- Fallback IA après 8 secondes -->
+                <div id="radarFallbackBox" class="radar-fallback-box hidden">
+                    <div class="fallback-badge">⏱️ <span data-i18n="radar_no_human">Aucun rival humain disponible</span></div>
+                    <p class="fallback-question" data-i18n="radar_fallback_prompt">Voulez-vous affronter l'IA KI FRAID immédiatement ou continuer d'attendre ?</p>
+                    <div class="fallback-buttons">
+                        <button id="btnFallbackAi" class="btn btn-warning btn-sm" type="button">
+                            <span data-i18n="btn_challenge_ai_instant">🤖 Défier KI FRAID Immédiatement</span>
+                        </button>
+                        <button id="btnContinueWait" class="btn btn-secondary btn-sm" type="button">
+                            <span data-i18n="btn_continue_waiting">⏳ Continuer d'attendre</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="radar-actions">
+                    <button id="btnCancelMatchmaking" class="btn btn-outline-danger btn-sm" type="button">
+                        <span data-i18n="btn_cancel_search">❌ Annuler la recherche</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Profil Joueur & Classement E-Sport -->
+        <div id="profileModal" class="modal-overlay hidden">
+            <div class="modal-card glass-card profile-modal-card">
+                <div class="profile-modal-header">
+                    <div class="profile-header-meta">
+                        <span class="profile-avatar-icon" id="profileModalBadge">🥇</span>
+                        <div>
+                            <h3 class="profile-name" id="profileModalName">Joueur 1</h3>
+                            <span class="profile-league-tag" id="profileModalLeague">Ligue Or I • 1000 MMR</span>
+                        </div>
+                    </div>
+                    <button id="btnCloseProfile" class="btn-close-modal" aria-label="Fermer">✕</button>
+                </div>
+
+                <!-- 4 Statistiques Carrière -->
+                <div class="profile-stats-grid">
+                    <div class="pstat-box">
+                        <span class="pstat-val" id="careerMatches">0</span>
+                        <span class="pstat-lbl" data-i18n="stat_career_matches">MATCHS</span>
+                    </div>
+                    <div class="pstat-box">
+                        <span class="pstat-val" id="careerWinrate">0%</span>
+                        <span class="pstat-lbl" data-i18n="stat_career_winrate">VICTOIRES</span>
+                    </div>
+                    <div class="pstat-box">
+                        <span class="pstat-val" id="careerAccuracy">100%</span>
+                        <span class="pstat-lbl" data-i18n="stat_career_accuracy">PRÉCISION</span>
+                    </div>
+                    <div class="pstat-box">
+                        <span class="pstat-val" id="careerMaxCombo">x0</span>
+                        <span class="pstat-lbl" data-i18n="stat_career_combo">MAX COMBO</span>
+                    </div>
+                </div>
+
+                <!-- Onglets Profil : Historique Récent vs Classement Arène -->
+                <div class="profile-tabs">
+                    <button type="button" class="ptab-btn active" data-ptab="history" id="ptabHistory" data-i18n="history_title">HISTORIQUE RÉCENT</button>
+                    <button type="button" class="ptab-btn" data-ptab="leaderboard" id="ptabLeaderboard" data-i18n="leaderboard_title">TOP 5 ARÈNE</button>
+                </div>
+
+                <!-- Conteneur Historique Récent -->
+                <div class="profile-tab-content" id="historyTabContent">
+                    <div class="history-list" id="profileHistoryList">
+                        <!-- Rempli dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Conteneur Top 5 Leaderboard -->
+                <div class="profile-tab-content hidden" id="leaderboardTabContent">
+                    <div class="leaderboard-list" id="profileLeaderboardList">
+                        <!-- Rempli dynamiquement depuis l'API -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast de Notification (Feedbacks rejets / alertes) -->
         <div id="toastNotification" class="toast-notification hidden"></div>
     </div>
 
-    <script src="js/app.js"></script>
+    <script src="js/i18n.js?v=18.0"></script>
+    <script src="js/commentator.js?v=18.0"></script>
+    <script src="js/app.js?v=18.0"></script>
+    <script src="js/animations.js?v=18.0"></script>
 </body>
 </html>
