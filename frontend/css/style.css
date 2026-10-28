@@ -1623,16 +1623,43 @@ body:has(#gameSection:not(.hidden)) {
     transform: scale(1.08);
 }
 
+.caster-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 @media (max-width: 640px) {
     .caster-hud-card {
         flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-        padding: 10px 14px;
+        align-items: stretch;
+        gap: 8px;
+        padding: 8px 12px;
     }
     .caster-profile {
         width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .caster-bubble-container {
+        width: 100%;
+        padding: 6px 12px;
+        min-height: auto;
+    }
+    .caster-actions-row {
+        width: 100%;
+        display: flex;
+        align-items: center;
         justify-content: space-between;
+        gap: 6px;
+    }
+    .player-rank-pill {
+        flex: 1;
+        justify-content: center;
+        padding: 5px 10px;
+        font-size: 0.74rem;
+        white-space: nowrap;
     }
 }
 
@@ -2756,52 +2783,308 @@ body:has(#gameSection:not(.hidden)) {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(15, 23, 42, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 6px;
     padding: 6px 10px;
     font-size: 0.74rem;
+    gap: 8px;
 }
 
 .history-item.win { border-left: 3px solid var(--neon-green); }
 .history-item.loss { border-left: 3px solid var(--neon-red); }
 .history-item.draw { border-left: 3px solid #f59e0b; }
 
-.history-outcome {
-    font-weight: 800;
+.history-item-left, .leaderboard-item-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    overflow: hidden;
 }
-.history-outcome.win { color: #6ee7b7; }
-.history-outcome.loss { color: #fca5a5; }
-.history-outcome.draw { color: #fde68a; }
 
-.history-meta {
+.history-item-right, .leaderboard-item-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.history-badge {
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+}
+.history-badge.win { background: rgba(16, 185, 129, 0.25); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); }
+.history-badge.loss { background: rgba(239, 68, 68, 0.25); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
+.history-badge.draw { background: rgba(245, 158, 11, 0.25); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.4); }
+
+.history-mode {
+    font-size: 0.70rem;
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.history-date {
     font-size: 0.65rem;
     color: #64748b;
+}
+
+.history-accuracy {
+    font-size: 0.68rem;
+    color: #cbd5e1;
 }
 
 .history-mmr {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
-    font-size: 0.72rem;
+    font-size: 0.74rem;
 }
-.history-mmr.pos { color: #10b981; }
-.history-mmr.neg { color: #ef4444; }
+.history-mmr.gain { color: #10b981; }
+.history-mmr.loss { color: #ef4444; }
 
-.leaderboard-item .lead-rank {
-    font-weight: 900;
-    color: #f59e0b;
+.leaderboard-rank-icon {
+    font-size: 1rem;
     min-width: 20px;
+    text-align: center;
 }
-.leaderboard-item .lead-name {
-    flex: 1;
+
+.leaderboard-player-name {
     font-weight: 700;
     color: #f1f5f9;
-    padding: 0 8px;
+    font-size: 0.76rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.leaderboard-item .lead-mmr {
+
+.leaderboard-league-badge {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #f59e0b;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 0.60rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.leaderboard-winrate {
+    font-size: 0.68rem;
+    color: #94a3b8;
+}
+
+.leaderboard-mmr {
     font-family: 'JetBrains Mono', monospace;
     font-weight: 800;
     color: var(--neon-cyan);
+    font-size: 0.76rem;
+}
+
+.history-empty {
+    text-align: center;
+    color: #64748b;
+    font-size: 0.75rem;
+    padding: 18px 0;
+    font-style: italic;
+}
+
+/* ==========================================================================
+   REFONTE RESPONSIVE MOBILE & PETITS ÉCRANS (<= 640px)
+   ========================================================================== */
+
+@media (max-width: 640px) {
+    /* Header compact */
+    .header-bar {
+        padding: 4px 10px;
+        margin-bottom: 6px;
+    }
+
+    .lang-btn {
+        padding: 3px 8px;
+        font-size: 0.72rem;
+    }
+
+    .network-badge {
+        padding: 2px 7px;
+        font-size: 0.68rem;
+    }
+
+    /* Lobby Command Center */
+    .command-center {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+
+    .command-top-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .quick-join-group {
+        width: 100%;
+    }
+
+    .quick-join-input-wrap {
+        width: 100%;
+    }
+
+    .quick-join-input-wrap input {
+        flex: 1;
+        width: auto;
+        height: 36px;
+        font-size: 0.85rem;
+    }
+
+    .btn-join-compact {
+        padding: 8px 14px;
+        font-size: 0.82rem;
+        height: 36px;
+    }
+
+    /* Paramètres en 1 colonne pleine largeur pour boutons tactiles */
+    .params-row,
+    .params-row.two-cols {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+
+    .segmented-bar {
+        height: 36px;
+        padding: 3px;
+        border-radius: 8px;
+    }
+
+    .seg-item {
+        font-size: 0.76rem;
+        font-weight: 700;
+        padding: 4px 6px;
+        border-radius: 6px;
+    }
+
+    /* Boutons de lancement en pleine largeur */
+    .lobby-launch-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-top: 2px;
+    }
+
+    .btn-main-launch,
+    .btn-matchmaking {
+        height: 48px;
+        font-size: 0.95rem;
+        border-radius: 10px;
+    }
+
+    /* In-Game : plateau & pavé tactile */
+    .arena-container.in-game {
+        padding: 4px 6px;
+        gap: 5px;
+    }
+
+    .arena-container.in-game .match-bar {
+        padding: 4px 8px;
+        gap: 4px;
+    }
+
+    .arena-container.in-game .sudoku-grid {
+        width: min(350px, calc(100dvh - 270px), 94vw);
+        height: min(350px, calc(100dvh - 270px), 94vw);
+    }
+
+    .arena-container.in-game .controls-container {
+        padding: 4px;
+        gap: 4px;
+        max-width: min(350px, 94vw);
+    }
+
+    .arena-container.in-game .numpad-grid {
+        grid-template-columns: repeat(9, 1fr);
+        gap: 3px;
+    }
+
+    .arena-container.in-game .numpad-btn {
+        padding: 8px 0;
+        min-height: 42px;
+        font-size: 1.15rem;
+        border-radius: 6px;
+    }
+
+    /* Barre d'émotes hype en bas du jeu */
+    .emote-hype-container {
+        padding: 3px 6px;
+        gap: 5px;
+        max-width: min(350px, 94vw);
+    }
+
+    .btn-emote {
+        width: 32px;
+        height: 32px;
+        font-size: 1.05rem;
+    }
+
+    /* Modals Responsive */
+    .profile-modal-card {
+        width: min(400px, 94vw);
+        max-height: 85vh;
+        padding: 14px 14px;
+        gap: 8px;
+    }
+
+    .profile-stats-grid {
+        gap: 5px;
+    }
+
+    .pstat-box {
+        padding: 6px 4px;
+    }
+
+    .pstat-val {
+        font-size: 0.92rem;
+    }
+
+    .pstat-lbl {
+        font-size: 0.54rem;
+    }
+
+    .profile-tab-content {
+        max-height: 180px;
+    }
+}
+
+/* Très petits mobiles (<= 380px) */
+@media (max-width: 380px) {
+    .discipline-grid {
+        gap: 4px;
+    }
+
+    .discipline-card {
+        padding: 6px 4px;
+    }
+
+    .card-icon {
+        font-size: 1.15rem;
+    }
+
+    .card-title {
+        font-size: 0.70rem;
+    }
+
+    .card-subtitle {
+        font-size: 0.58rem;
+    }
+
+    .profile-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .arena-container.in-game .numpad-btn {
+        font-size: 1rem;
+        min-height: 38px;
+    }
 }
 
 
