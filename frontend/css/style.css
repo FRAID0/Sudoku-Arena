@@ -2366,6 +2366,211 @@ body:has(#gameSection:not(.hidden)) {
     margin-top: 2px;
 }
 
+/* ==========================================================================
+   Mode Spectateur & Réactions / Émotes Rapides (Option C)
+   ========================================================================== */
+
+.btn-outline-spectate {
+    background: rgba(168, 85, 247, 0.15);
+    border: 1px solid rgba(168, 85, 247, 0.6);
+    color: #e9d5ff;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.btn-outline-spectate:hover {
+    background: rgba(168, 85, 247, 0.35);
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+    color: #ffffff;
+}
+
+.spectator-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    border-radius: 12px;
+    padding: 2px 7px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #cbd5e1;
+}
+
+.spectator-role-tag {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.3) 0%, rgba(220, 38, 38, 0.3) 100%);
+    border: 1px solid #f59e0b;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.64rem;
+    font-weight: 800;
+    color: #fef08a;
+    letter-spacing: 0.06em;
+    animation: spectatorPulse 2s infinite ease-in-out;
+}
+
+@keyframes spectatorPulse {
+    0%, 100% { opacity: 1; text-shadow: 0 0 6px rgba(245, 158, 11, 0.6); }
+    50% { opacity: 0.7; text-shadow: none; }
+}
+
+/* Hype Wheel & Bar */
+.emote-hype-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    background: rgba(10, 15, 30, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin-top: 4px;
+    width: 100%;
+}
+
+.hype-meter-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hype-label {
+    font-size: 0.64rem;
+    font-weight: 800;
+    color: #f59e0b;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+}
+
+.hype-track {
+    flex: 1;
+    height: 6px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.hype-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f59e0b 0%, #ec4899 50%, #8b5cf6 100%);
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+    transition: width 0.3s ease;
+    border-radius: 6px;
+}
+
+.hype-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 800;
+    color: #f8fafc;
+    min-width: 28px;
+    text-align: right;
+}
+
+.emote-buttons-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.btn-emote {
+    flex: 1;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    font-size: 1.05rem;
+    padding: 3px 0;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.btn-emote:hover {
+    transform: scale(1.22) translateY(-2px);
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
+}
+
+.btn-emote:active {
+    transform: scale(0.92);
+}
+
+/* Particules d'émotes flottantes */
+.emote-particle-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 100;
+}
+
+.floating-emote-bubble {
+    position: absolute;
+    font-size: 2rem;
+    filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.7));
+    pointer-events: none;
+    animation: floatUpAndFade 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.floating-emote-author {
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.60rem;
+    font-weight: 700;
+    color: #ffffff;
+    background: rgba(10, 15, 30, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 1px 5px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+@keyframes floatUpAndFade {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.6);
+    }
+    15% {
+        opacity: 1;
+        transform: translateY(0) scale(1.15);
+    }
+    30% {
+        transform: translateY(-20px) scale(1.0);
+    }
+    80% {
+        opacity: 0.85;
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-160px) scale(0.75);
+    }
+}
+
+/* Verrouillage Spectateur sur les cases */
+.game-layout.spectator-view .sudoku-grid {
+    pointer-events: none;
+}
+.game-layout.spectator-view .numpad-grid,
+.game-layout.spectator-view #btnErase {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
 
 
 

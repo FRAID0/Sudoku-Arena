@@ -533,7 +533,8 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
         "player_id": player_id,
         "player_name": player_name,
         "role": role,
-        "players": [{"id": p.player_id, "name": p.name, "is_host": p.is_host} for p in room.player_list]
+        "players": [{"id": p.player_id, "name": p.name, "is_host": p.is_host} for p in room.player_list],
+        "spectators_count": len(room.spectators)
     })
 
     # Lancement automatique immédiat si salon de matchmaking 1-clic et 2 joueurs réunis
@@ -601,6 +602,28 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
                             "reason": "timeout",
                             "player": timeout_res.get("timed_out_player_id")
                         })
+
+            elif action == "SEND_EMOTE":
+                emote_key = data.get("emote_key", "fire")
+                await ws_manager.broadcast(code, {
+                    "event": "EMOTE_BURST",
+                    "player_id": player_id,
+                    "player_name": player_name,
+                    "role": role,
+                    "emote_key": emote_key
+                })
+                publish_mqtt("game/emote", {
+                    "room": code,
+                    "player": player_name,
+                    "emote": emote_key
+                })
+
+            elif action == "HYPE_BURST":
+                await ws_manager.broadcast(code, {
+                    "event": "HYPE_UPDATE",
+                    "player_id": player_id,
+                    "player_name": player_name
+                })
 
     except WebSocketDisconnect:
         ws_manager.disconnect(code, websocket)

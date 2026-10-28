@@ -73,7 +73,11 @@ const state = {
     errorMovesCount: 0,
     currentComboStreak: 0,
     maxComboStreak: 0,
-    lastDebriefText: ""
+    lastDebriefText: "",
+    // Mode Spectateur & Hype
+    isSpectator: false,
+    spectatorCount: 0,
+    hypeScore: 50
 };
 
 // Éléments du DOM
@@ -170,7 +174,17 @@ const dom = {
     radarFallbackBox: document.getElementById("radarFallbackBox"),
     btnFallbackAi: document.getElementById("btnFallbackAi"),
     btnContinueWait: document.getElementById("btnContinueWait"),
-    btnCancelMatchmaking: document.getElementById("btnCancelMatchmaking")
+    btnCancelMatchmaking: document.getElementById("btnCancelMatchmaking"),
+
+    // Spectateur & Émotes Hype Wheel (Option C)
+    btnSpectateRoom: document.getElementById("btnSpectateRoom"),
+    displaySpectatorBadge: document.getElementById("displaySpectatorBadge"),
+    spectatorCount: document.getElementById("spectatorCount"),
+    spectatorRoleTag: document.getElementById("spectatorRoleTag"),
+    emoteHypeContainer: document.getElementById("emoteHypeContainer"),
+    hypeProgressFill: document.getElementById("hypeProgressFill"),
+    hypeScoreText: document.getElementById("hypeScoreText"),
+    emoteParticleLayer: document.getElementById("emoteParticleLayer")
 };
 
 // Système de Toast de Notification (Non intrusif)
@@ -286,6 +300,7 @@ function buildBoardUI(initialPuzzle) {
 }
 
 function selectCell(row, col) {
+    if (state.isSpectator) return;
     const cellEl = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
     const isFilled = cellEl && (cellEl.classList.contains("fixed") || cellEl.classList.contains("user-filled") || cellEl.classList.contains("opponent-filled"));
 
@@ -331,6 +346,7 @@ function selectCell(row, col) {
 }
 
 function handleInput(number) {
+    if (state.isSpectator) return;
     if (window.caster) caster.playSfx("click");
     // Vérification du tour en mode Clash
     if ((state.mode === "clash" || state.mode === "solo_ai") && state.currentTurn && state.currentTurn !== state.playerId) {
@@ -472,6 +488,15 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
 
         if (msg.event === "PLAYER_JOINED") {
             updatePlayersLobby(msg.players);
+            if (msg.spectators_count !== undefined && dom.spectatorCount) {
+                dom.spectatorCount.textContent = msg.spectators_count;
+            }
+            if (msg.role === "spectator" && msg.player_id === state.playerId) {
+                state.isSpectator = true;
+                if (dom.gameSection) dom.gameSection.classList.add("spectator-view");
+                if (dom.spectatorRoleTag) dom.spectatorRoleTag.classList.remove("hidden");
+                showToast(window.i18n ? i18n.t("toast_spectator_mode_active") : "Mode Spectateur activé : vous observez le match en direct.", "info");
+            }
             if (msg.players && msg.players.length >= 2) {
                 closeMatchmakingOverlay();
                 dom.lobbySection.classList.add("hidden");
@@ -682,6 +707,11 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
                 if (dom.btnStartGame) dom.btnStartGame.classList.add("hidden");
             }
             showToast(window.i18n ? i18n.t("toast_player_left_lobby") : "Un joueur a quitté le salon.", "info");
+        } else if (msg.event === "EMOTE_BURST") {
+            spawnEmoteParticle(msg.emote_key, msg.player_name, msg.role);
+            boostHype(4);
+        } else if (msg.event === "HYPE_UPDATE") {
+            boostHype(6);
         }
     };
 
@@ -1236,6 +1266,17 @@ function initCommandCenter() {
 
     // 6. Guide Modal
     initTabbedGuideModal();
+
+    // 7. Spectateur & Émotes Hype Wheel (Option C)
+    if (dom.btnSpectateRoom) {
+        dom.btnSpectateRoom.addEventListener("click", joinAsSpectator);
+    }
+    document.querySelectorAll(".btn-emote").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const emote = btn.dataset.emote;
+            sendEmote(emote);
+        });
+    });
 }
 
 // ==========================================================================
@@ -1401,6 +1442,96 @@ async function triggerFallbackAi() {
     }
 }
 
+// ==========================================================================
+// Logique Spectateur & Émotes Hype Wheel (Option C)
+// ==========================================================================
+
+const EMOTE_MAP = {
+    fire: "🔥",
+    brain: "🧠",
+    speed: "⚡",
+    panic: "😱",
+    gg: "👏",
+    fraid: "🤖"
+};
+
+function sendEmote(emoteKey) {
+    if (!state.roomCode) return;
+    if (state.socket && state.socket.readyState === WebSocket.OPEN) {
+        state.socket.send(JSON.stringify({
+            action: "SEND_EMOTE",
+            emote_key: emoteKey
+        }));
+    }
+}
+
+function boostHype(delta = 4) {
+    state.hypeScore = Math.min(100, Math.max(10, state.hypeScore + delta));
+    updateHypeUI();
+}
+
+function updateHypeUI() {
+    if (dom.hypeProgressFill) {
+        dom.hypeProgressFill.style.width = `${state.hypeScore}%`;
+    }
+    if (dom.hypeScoreText) {
+        dom.hypeScoreText.textContent = `${state.hypeScore}%`;
+    }
+}
+
+function spawnEmoteParticle(emoteKey, authorName = "", role = "player") {
+    if (!dom.emoteParticleLayer) return;
+    const emoji = EMOTE_MAP[emoteKey] || "🔥";
+    const bubble = document.createElement("div");
+    bubble.className = "floating-emote-bubble";
+
+    const randomLeft = Math.floor(Math.random() * 70) + 10;
+    bubble.style.left = `${randomLeft}%`;
+    bubble.style.bottom = "30px";
+
+    const isSpectator = role === "spectator";
+    const authorTag = authorName ? `<span class="floating-emote-author">${isSpectator ? "👁️ " : ""}${authorName}</span>` : "";
+    bubble.innerHTML = `${authorTag}${emoji}`;
+
+    dom.emoteParticleLayer.appendChild(bubble);
+
+    if (window.caster) {
+        if (emoteKey === "fire" || emoteKey === "speed") caster.playSfx("combo");
+        else if (emoteKey === "panic") caster.playSfx("error");
+        else caster.playSfx("valid");
+    }
+
+    setTimeout(() => {
+        bubble.remove();
+    }, 2300);
+}
+
+function joinAsSpectator() {
+    const code = dom.joinCodeInput.value.trim().toUpperCase();
+    if (code.length !== 4) {
+        showToast(window.i18n ? i18n.t("toast_invalid_code") : "Code à 4 lettres invalide.", "error");
+        return;
+    }
+    const defaultName = window.i18n ? i18n.t("default_player_2") : "Spectateur";
+    const rawName = (dom.playerNameInput ? dom.playerNameInput.value.trim() : "") || defaultName;
+    state.playerName = rawName;
+    state.roomCode = code;
+    state.isHost = false;
+    state.isSpectator = true;
+
+    dom.displayRoomCode.textContent = state.roomCode;
+    dom.p1Name.textContent = state.playerName;
+
+    dom.lobbySection.classList.add("hidden");
+    dom.gameSection.classList.remove("hidden");
+    dom.gameSection.classList.add("spectator-view");
+    if (dom.spectatorRoleTag) dom.spectatorRoleTag.classList.remove("hidden");
+    document.body.classList.add("in-game");
+    if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
+
+    connectWebSocket(state.roomCode);
+}
+
 // Actions rétro-compatibles
 if (dom.btnCreateRoom) {
     dom.btnCreateRoom.addEventListener("click", createRoomGame);
@@ -1528,6 +1659,14 @@ window.addEventListener("keydown", (e) => {
         handleInput(parseInt(e.key, 10));
     } else if (e.key === "Backspace" || e.key === "Delete") {
         dom.btnErase.click();
+    } else if (document.activeElement && document.activeElement.tagName !== "INPUT") {
+        const k = e.key.toLowerCase();
+        if (k === "f") sendEmote("fire");
+        else if (k === "b") sendEmote("brain");
+        else if (k === "s") sendEmote("speed");
+        else if (k === "p") sendEmote("panic");
+        else if (k === "g") sendEmote("gg");
+        else if (k === "k") sendEmote("fraid");
     }
 });
 

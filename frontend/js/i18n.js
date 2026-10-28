@@ -66,6 +66,9 @@ const translations = {
         "join_desc": "Entrez le code à 4 lettres d'un ami pour rejoindre son arène multijoueur en direct.",
         "join_placeholder": "CODE (EX: K9AF)",
         "btn_join": "Rejoindre ⚔️",
+        "btn_spectate": "👁️ Regarder",
+        "spectator_role_label": "MODE SPECTATEUR",
+        "toast_spectator_mode_active": "Mode Spectateur activé : vous observez le match en direct.",
 
         // Explications Vocales des Paramètres
         "explain_val_simple": "Mode Simple : Tout chiffre valide selon les règles Sudoku est accepté, sans forcer la solution finale unique.",
@@ -238,6 +241,9 @@ const translations = {
         "join_desc": "Enter a 4-letter room code from your rival to jump into live battle.",
         "join_placeholder": "CODE (E.G. K9AF)",
         "btn_join": "Join ⚔️",
+        "btn_spectate": "👁️ Spectate",
+        "spectator_role_label": "SPECTATOR MODE",
+        "toast_spectator_mode_active": "Spectator Mode active: you are watching live.",
 
         // Parameter Audio Explanations
         "explain_val_simple": "Simple Mode: Any placement respecting standard Sudoku rules is accepted, without forcing the single end solution.",
@@ -410,6 +416,9 @@ const translations = {
         "join_desc": "Gib den 4-stelligen Raumcode eines Freundes ein, um dem Duell beizutreten.",
         "join_placeholder": "CODE (Z.B. K9AF)",
         "btn_join": "Beitreten ⚔️",
+        "btn_spectate": "👁️ Zuschauen",
+        "spectator_role_label": "ZUSCHAUER-MODUS",
+        "toast_spectator_mode_active": "Zuschauer-Modus aktiv: Du schaust live zu.",
 
         // Parameter Audio-Erklärungen
         "explain_val_simple": "Einfache Regeln: Jede gültige Sudoku-Zahl wird akzeptiert, ohne die finale Endlösung zu erzwingen.",
