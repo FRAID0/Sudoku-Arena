@@ -35,10 +35,14 @@
     pointer-events: none;
 }
 
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
 html, body {
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
+    width: 100%;
     min-height: 100%;
 }
 
@@ -53,21 +57,24 @@ body {
     min-height: 100vh;
     min-height: 100dvh;
     overflow-x: hidden;
-    overflow-y: auto; /* Permet le défilement fluide dans le lobby */
+    overflow-y: auto;
     display: flex;
-    justify-content: center;
-    align-items: flex-start;
+    flex-direction: column;
+    align-items: center;
     padding: 6px 10px;
 }
 
-body.in-game,
-body:has(#gameSection:not(.hidden)),
-body:has(.arena-container.in-game) {
-    overflow: hidden !important;
-    padding: 2px 8px !important;
-    align-items: stretch !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
+/* Verrouillage Zero-Scroll STRICTEMENT réservé au Desktop (>= 769px) */
+@media (min-width: 769px) {
+    body.in-game,
+    body:has(#gameSection:not(.hidden)),
+    body:has(.arena-container.in-game) {
+        overflow: hidden !important;
+        padding: 2px 8px !important;
+        align-items: stretch !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+    }
 }
 
 .arena-container {
@@ -2899,73 +2906,207 @@ input:focus, select:focus {
    ========================================================================== */
 
 @media (max-width: 640px) {
+    body {
+        padding: 4px 6px;
+    }
+
+    .arena-container {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        gap: 6px;
+    }
+
+    /* Bandeau LED IoT compact & fluide */
+    .iot-led-station {
+        padding: 4px 8px;
+    }
+
+    .led-bar-label {
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-bottom: 4px;
+        font-size: 10px;
+    }
+
+    .iot-title-left {
+        font-size: 0.65rem;
+    }
+
+    .iot-title-left span:last-child {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 150px;
+    }
+
+    .lang-selector-group {
+        gap: 4px;
+    }
+
+    .lang-btn {
+        padding: 2px 6px;
+        font-size: 0.70rem;
+    }
+
+    .network-badge {
+        padding: 2px 6px;
+        font-size: 0.66rem;
+    }
+
+    /* Titre Brand compact */
+    .brand-header {
+        margin: 2px 0;
+        text-align: center;
+    }
+
+    .glitch-title {
+        font-size: 1.5rem;
+        letter-spacing: 2px;
+    }
+
+    .subtitle {
+        font-size: 0.62rem;
+        letter-spacing: 0.5px;
+    }
+
     /* Header compact */
     .header-bar {
         padding: 4px 10px;
         margin-bottom: 6px;
     }
 
-    .lang-btn {
-        padding: 3px 8px;
-        font-size: 0.72rem;
-    }
-
-    .network-badge {
-        padding: 2px 7px;
-        font-size: 0.68rem;
-    }
-
     /* Lobby Command Center */
     .command-center {
-        padding: 10px 12px;
+        padding: 10px 10px;
         gap: 8px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
     }
 
     .command-top-bar {
         flex-direction: column;
         align-items: stretch;
         gap: 8px;
+        width: 100%;
     }
 
+    .player-identity-group,
     .quick-join-group {
         width: 100%;
     }
 
+    .player-identity-group input {
+        width: 100%;
+        height: 38px;
+        font-size: 0.90rem;
+        box-sizing: border-box;
+    }
+
     .quick-join-input-wrap {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
         width: 100%;
     }
 
     .quick-join-input-wrap input {
-        flex: 1;
-        width: auto;
-        height: 36px;
-        font-size: 0.85rem;
+        grid-column: 1 / 3;
+        width: 100%;
+        height: 38px;
+        font-size: 0.90rem;
+        box-sizing: border-box;
     }
 
     .btn-join-compact {
-        padding: 8px 14px;
-        font-size: 0.82rem;
+        width: 100%;
         height: 36px;
+        padding: 0 8px;
+        font-size: 0.78rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Disciplines : 1 carte par ligne avec icône à gauche */
+    .discipline-grid {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        width: 100%;
+    }
+
+    .discipline-card {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-rows: auto auto;
+        gap: 2px 10px;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 8px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .discipline-icon {
+        grid-column: 1 / 2;
+        grid-row: 1 / 3;
+        font-size: 1.6rem;
+    }
+
+    .discipline-title {
+        grid-column: 2 / 3;
+        grid-row: 1 / 2;
+        font-size: 0.90rem;
+        font-weight: 800;
+        margin: 0;
+    }
+
+    .discipline-desc {
+        grid-column: 2 / 3;
+        grid-row: 2 / 3;
+        font-size: 0.70rem;
+        color: #94a3b8;
+        line-height: 1.25;
+        margin: 0;
     }
 
     /* Paramètres en 1 colonne pleine largeur pour boutons tactiles */
+    .parameters-deck {
+        padding: 8px 10px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
     .params-row,
     .params-row.two-cols {
         grid-template-columns: 1fr;
         gap: 8px;
+        width: 100%;
+    }
+
+    .param-item {
+        width: 100%;
     }
 
     .segmented-bar {
-        height: 36px;
+        height: 38px;
         padding: 3px;
         border-radius: 8px;
+        width: 100%;
+        display: flex;
     }
 
     .seg-item {
+        flex: 1;
         font-size: 0.76rem;
         font-weight: 700;
         padding: 4px 6px;
         border-radius: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: center;
     }
 
     /* Boutons de lancement en pleine largeur */
@@ -3168,35 +3309,16 @@ input:focus, select:focus {
 
 /* Très petits mobiles (<= 380px) */
 @media (max-width: 380px) {
-    .discipline-grid {
-        gap: 4px;
-    }
-
-    .discipline-card {
-        padding: 6px 4px;
-    }
-
-    .card-icon {
-        font-size: 1.15rem;
-    }
-
-    .card-title {
-        font-size: 0.70rem;
-    }
-
-    .card-subtitle {
-        font-size: 0.58rem;
-    }
-
     .profile-stats-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 
     .arena-container.in-game .numpad-btn {
-        font-size: 1rem;
-        min-height: 38px;
+        font-size: 1.1rem !important;
+        min-height: 40px !important;
     }
 }
+
 
 
 
