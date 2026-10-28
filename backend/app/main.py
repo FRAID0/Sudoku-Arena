@@ -477,6 +477,18 @@ async def matchmaking_stats():
     return room_manager.get_matchmaking_stats()
 
 
+@app.get("/api/leaderboard")
+async def get_leaderboard():
+    """Retourne le Top Classement E-Sport officiel de Sudoku Arena."""
+    return [
+        {"rank": 1, "name": "KI FRAID (Grand Maître) 🤖", "mmr": 2840, "league": "Grand Maître", "badge": "👑", "winrate": "98%"},
+        {"rank": 2, "name": "NeoSolver_99", "mmr": 2350, "league": "Diamant I", "badge": "💠", "winrate": "84%"},
+        {"rank": 3, "name": "SpeedDigit", "mmr": 2180, "league": "Diamant II", "badge": "💠", "winrate": "79%"},
+        {"rank": 4, "name": "CyberNinja", "mmr": 1920, "league": "Platine I", "badge": "💎", "winrate": "72%"},
+        {"rank": 5, "name": "MatrixClasher", "mmr": 1640, "league": "Platine III", "badge": "💎", "winrate": "65%"}
+    ]
+
+
 
 @app.get("/api/rooms/{room_code}")
 async def get_room(room_code: str):

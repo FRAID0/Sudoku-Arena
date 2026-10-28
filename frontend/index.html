@@ -62,6 +62,9 @@
                 <span id="voiceIcon">🔊</span>
             </button>
             <a href="audio-benchmark.html" class="caster-audio-toggle" style="text-decoration:none;font-size:0.9rem;" title="Banc d'Essai & Choix des Voix">🎧</a>
+            <button id="btnOpenProfile" class="player-rank-pill" title="Profil & Rang E-Sport">
+                <span id="profileRankIcon">🥇</span> <span id="profileRankTitle">Or I</span> • <span id="profileMmrText">1000 MMR</span>
+            </button>
         </section>
 
         <!-- Section Lobby (Arena Command Center) -->
@@ -326,7 +329,10 @@
                 <!-- En-tête : Titre & Badge E-Sport -->
                 <div class="post-game-header">
                     <h2 id="modalWinnerTitle" class="neon-accent" data-i18n="victory_title">VICTOIRE ! 🏆</h2>
-                    <div class="post-game-badge" id="postGameBadge">🏆 MAÎTRE DU COMBO</div>
+                    <div class="post-game-header-badges">
+                        <span class="post-game-mmr-tag" id="postGameMmrDelta">+25 MMR 📈</span>
+                        <div class="post-game-badge" id="postGameBadge">🏆 MAÎTRE DU COMBO</div>
+                    </div>
                 </div>
 
                 <p id="modalWinnerDesc" class="post-game-desc" data-i18n="modal_winner_desc">Vous avez complété la grille en premier avec brio !</p>
@@ -424,13 +430,69 @@
             </div>
         </div>
 
+        <!-- Modal Profil Joueur & Classement E-Sport -->
+        <div id="profileModal" class="modal-overlay hidden">
+            <div class="modal-card glass-card profile-modal-card">
+                <div class="profile-modal-header">
+                    <div class="profile-header-meta">
+                        <span class="profile-avatar-icon" id="profileModalBadge">🥇</span>
+                        <div>
+                            <h3 class="profile-name" id="profileModalName">Joueur 1</h3>
+                            <span class="profile-league-tag" id="profileModalLeague">Ligue Or I • 1000 MMR</span>
+                        </div>
+                    </div>
+                    <button id="btnCloseProfile" class="btn-close-modal" aria-label="Fermer">✕</button>
+                </div>
+
+                <!-- 4 Statistiques Carrière -->
+                <div class="profile-stats-grid">
+                    <div class="pstat-box">
+                        <span class="pstat-val" id="careerMatches">0</span>
+                        <span class="pstat-lbl" data-i18n="stat_career_matches">MATCHS</span>
+                    </div>
+                    <div class="pstat-box">
+                        <span class="pstat-val" id="careerWinrate">0%</span>
+                        <span class="pstat-lbl" data-i18n="stat_career_winrate">VICTOIRES</span>
+                    </div>
+                    <div class="pstat-box">
+                        <span class="pstat-val" id="careerAccuracy">100%</span>
+                        <span class="pstat-lbl" data-i18n="stat_career_accuracy">PRÉCISION</span>
+                    </div>
+                    <div class="pstat-box">
+                        <span class="pstat-val" id="careerMaxCombo">x0</span>
+                        <span class="pstat-lbl" data-i18n="stat_career_combo">MAX COMBO</span>
+                    </div>
+                </div>
+
+                <!-- Onglets Profil : Historique Récent vs Classement Arène -->
+                <div class="profile-tabs">
+                    <button type="button" class="ptab-btn active" data-ptab="history" id="ptabHistory" data-i18n="history_title">HISTORIQUE RÉCENT</button>
+                    <button type="button" class="ptab-btn" data-ptab="leaderboard" id="ptabLeaderboard" data-i18n="leaderboard_title">TOP 5 ARÈNE</button>
+                </div>
+
+                <!-- Conteneur Historique Récent -->
+                <div class="profile-tab-content" id="historyTabContent">
+                    <div class="history-list" id="profileHistoryList">
+                        <!-- Rempli dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Conteneur Top 5 Leaderboard -->
+                <div class="profile-tab-content hidden" id="leaderboardTabContent">
+                    <div class="leaderboard-list" id="profileLeaderboardList">
+                        <!-- Rempli dynamiquement depuis l'API -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast de Notification (Feedbacks rejets / alertes) -->
         <div id="toastNotification" class="toast-notification hidden"></div>
     </div>
 
-    <script src="js/i18n.js?v=17.0"></script>
-    <script src="js/commentator.js?v=17.0"></script>
-    <script src="js/app.js?v=17.0"></script>
-    <script src="js/animations.js?v=17.0"></script>
+    <script src="js/i18n.js?v=18.0"></script>
+    <script src="js/commentator.js?v=18.0"></script>
+    <script src="js/app.js?v=18.0"></script>
+    <script src="js/animations.js?v=18.0"></script>
 </body>
 </html>

@@ -184,7 +184,29 @@ const dom = {
     emoteHypeContainer: document.getElementById("emoteHypeContainer"),
     hypeProgressFill: document.getElementById("hypeProgressFill"),
     hypeScoreText: document.getElementById("hypeScoreText"),
-    emoteParticleLayer: document.getElementById("emoteParticleLayer")
+    emoteParticleLayer: document.getElementById("emoteParticleLayer"),
+
+    // Option D: Profil E-Sport & Ranked MMR
+    btnOpenProfile: document.getElementById("btnOpenProfile"),
+    profileRankIcon: document.getElementById("profileRankIcon"),
+    profileRankTitle: document.getElementById("profileRankTitle"),
+    profileMmrText: document.getElementById("profileMmrText"),
+    postGameMmrDelta: document.getElementById("postGameMmrDelta"),
+    profileModal: document.getElementById("profileModal"),
+    btnCloseProfile: document.getElementById("btnCloseProfile"),
+    profileModalBadge: document.getElementById("profileModalBadge"),
+    profileModalName: document.getElementById("profileModalName"),
+    profileModalLeague: document.getElementById("profileModalLeague"),
+    careerMatches: document.getElementById("careerMatches"),
+    careerWinrate: document.getElementById("careerWinrate"),
+    careerAccuracy: document.getElementById("careerAccuracy"),
+    careerMaxCombo: document.getElementById("careerMaxCombo"),
+    ptabHistory: document.getElementById("ptabHistory"),
+    ptabLeaderboard: document.getElementById("ptabLeaderboard"),
+    historyTabContent: document.getElementById("historyTabContent"),
+    leaderboardTabContent: document.getElementById("leaderboardTabContent"),
+    profileHistoryList: document.getElementById("profileHistoryList"),
+    profileLeaderboardList: document.getElementById("profileLeaderboardList")
 };
 
 // Système de Toast de Notification (Non intrusif)
@@ -761,6 +783,225 @@ function updatePlayersLobby(players) {
     }
 }
 
+// ==========================================================================
+// Logique Profil Joueur, MMR Ladder & Classement E-Sport (Option D)
+// ==========================================================================
+
+const PROFILE_STORAGE_KEY = "sudoku_arena_player_profile_v1";
+
+function getStoredProfile() {
+    try {
+        const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+        if (raw) {
+            return JSON.parse(raw);
+        }
+    } catch (e) {
+        // Fallback si localStorage corrompu ou restreint
+    }
+    return {
+        mmr: 1000,
+        matches: 0,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        totalMoves: 0,
+        validMoves: 0,
+        maxComboStreak: 0,
+        history: []
+    };
+}
+
+function saveStoredProfile(profile) {
+    try {
+        localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    } catch (e) {
+        // Fallback silencieux
+    }
+}
+
+function getLeagueByMmr(mmr) {
+    const currentLang = (window.i18n && window.i18n.currentLang) || "fr";
+    if (mmr >= 2500) {
+        return {
+            icon: "👑",
+            name: currentLang === "fr" ? "Grand Maître" : (currentLang === "de" ? "Großmeister" : "Grandmaster"),
+            color: "#f59e0b"
+        };
+    } else if (mmr >= 2000) {
+        return {
+            icon: "💠",
+            name: currentLang === "fr" ? "Diamant" : (currentLang === "de" ? "Diamant" : "Diamond"),
+            color: "#38bdf8"
+        };
+    } else if (mmr >= 1500) {
+        return {
+            icon: "💎",
+            name: currentLang === "fr" ? "Platine" : (currentLang === "de" ? "Platin" : "Platinum"),
+            color: "#06b6d4"
+        };
+    } else if (mmr >= 1000) {
+        return {
+            icon: "🥇",
+            name: currentLang === "fr" ? "Or I" : (currentLang === "de" ? "Gold I" : "Gold I"),
+            color: "#eab308"
+        };
+    } else if (mmr >= 500) {
+        return {
+            icon: "🥈",
+            name: currentLang === "fr" ? "Argent" : (currentLang === "de" ? "Silber" : "Silver"),
+            color: "#94a3b8"
+        };
+    } else {
+        return {
+            icon: "🟤",
+            name: currentLang === "fr" ? "Bronze" : (currentLang === "de" ? "Bronze" : "Bronze"),
+            color: "#b45309"
+        };
+    }
+}
+
+function updateProfileUI() {
+    const profile = getStoredProfile();
+    const league = getLeagueByMmr(profile.mmr);
+
+    // Pilule d'en-tête
+    if (dom.profileRankIcon) dom.profileRankIcon.textContent = league.icon;
+    if (dom.profileRankTitle) dom.profileRankTitle.textContent = league.name;
+    if (dom.profileMmrText) dom.profileMmrText.textContent = `${profile.mmr} MMR`;
+
+    // Modal profil
+    if (dom.profileModalBadge) dom.profileModalBadge.textContent = league.icon;
+    if (dom.profileModalName) dom.profileModalName.textContent = state.playerName || (window.i18n ? i18n.t("default_player_name") : "Joueur 1");
+    if (dom.profileModalLeague) {
+        const leaguePrefix = window.i18n ? i18n.t("league_prefix") : "Ligue";
+        dom.profileModalLeague.textContent = `${leaguePrefix} ${league.name} • ${profile.mmr} MMR`;
+    }
+
+    // 4 Tuiles Carrière
+    if (dom.careerMatches) dom.careerMatches.textContent = profile.matches.toString();
+    const winrate = profile.matches > 0 ? Math.round((profile.wins / profile.matches) * 100) : 0;
+    if (dom.careerWinrate) dom.careerWinrate.textContent = `${winrate}%`;
+    const accuracy = profile.totalMoves > 0 ? Math.round((profile.validMoves / profile.totalMoves) * 100) : 100;
+    if (dom.careerAccuracy) dom.careerAccuracy.textContent = `${accuracy}%`;
+    if (dom.careerMaxCombo) dom.careerMaxCombo.textContent = `x${profile.maxComboStreak}`;
+
+    // Rendu de l'historique
+    renderHistoryUI(profile.history || []);
+}
+
+function renderHistoryUI(historyList) {
+    if (!dom.profileHistoryList) return;
+    if (!historyList || historyList.length === 0) {
+        const emptyMsg = window.i18n ? i18n.t("history_empty") : "Aucun match joué pour le moment.";
+        dom.profileHistoryList.innerHTML = `<div class="history-empty">${emptyMsg}</div>`;
+        return;
+    }
+
+    dom.profileHistoryList.innerHTML = historyList.slice(0, 8).map(item => {
+        const isWin = item.isWinner;
+        const isDraw = item.isDraw;
+        const resultClass = isDraw ? "draw" : (isWin ? "win" : "loss");
+        const resultLabel = isDraw ? "ÉGALITÉ" : (isWin ? "VICTOIRE" : "DÉFAITE");
+        const deltaStr = item.deltaMmr >= 0 ? `+${item.deltaMmr}` : `${item.deltaMmr}`;
+        const deltaClass = item.deltaMmr >= 0 ? "gain" : "loss";
+        const dateStr = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const modeLabel = item.mode === "solo_ai" ? "Solo KI FRAID" : (item.mode === "race" ? "Course" : "Clash");
+
+        return `
+            <div class="history-item ${resultClass}">
+                <div class="history-item-left">
+                    <span class="history-badge ${resultClass}">${resultLabel}</span>
+                    <span class="history-mode">${modeLabel}</span>
+                    <span class="history-date">${dateStr}</span>
+                </div>
+                <div class="history-item-right">
+                    <span class="history-accuracy">${item.accuracy}% préc.</span>
+                    <span class="history-mmr ${deltaClass}">${deltaStr} MMR</span>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+async function loadLeaderboard() {
+    if (!dom.profileLeaderboardList) return;
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/leaderboard`);
+        if (res.ok) {
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : (data.leaderboard || []);
+            dom.profileLeaderboardList.innerHTML = list.map(item => {
+                const rankMedals = { 1: "🥇", 2: "🥈", 3: "🥉", 4: "4", 5: "5" };
+                const medal = rankMedals[item.rank] || item.rank;
+                return `
+                    <div class="leaderboard-item rank-${item.rank}">
+                        <div class="leaderboard-item-left">
+                            <span class="leaderboard-rank-icon">${medal}</span>
+                            <span class="leaderboard-player-name">${item.name}</span>
+                            <span class="leaderboard-league-badge">${item.league}</span>
+                        </div>
+                        <div class="leaderboard-item-right">
+                            <span class="leaderboard-winrate">${item.winrate}% win</span>
+                            <span class="leaderboard-mmr">${item.mmr} MMR</span>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        } else {
+            dom.profileLeaderboardList.innerHTML = `<div class="history-empty">Classement indisponible pour l'instant.</div>`;
+        }
+    } catch (e) {
+        dom.profileLeaderboardList.innerHTML = `<div class="history-empty">Erreur de chargement du classement.</div>`;
+    }
+}
+
+function recordMatchResult(isWinner, isDraw, stats) {
+    const profile = getStoredProfile();
+
+    let delta = 0;
+    if (isDraw) {
+        delta = 5;
+    } else if (isWinner) {
+        delta = 25;
+        // Bonus match parfait (0 faute)
+        if (stats.errors === 0 && stats.totalMoves >= 3) delta += 5;
+        // Bonus speedrun (< 60s)
+        if (stats.durationSec <= 60) delta += 5;
+    } else {
+        delta = -18;
+    }
+
+    profile.mmr = Math.max(0, profile.mmr + delta);
+    profile.matches += 1;
+    if (isDraw) profile.draws += 1;
+    else if (isWinner) profile.wins += 1;
+    else profile.losses += 1;
+
+    profile.totalMoves += stats.totalMoves;
+    profile.validMoves += stats.validMoves;
+    profile.maxComboStreak = Math.max(profile.maxComboStreak, stats.maxCombo);
+
+    if (!profile.history) profile.history = [];
+    profile.history.unshift({
+        id: "m_" + Date.now(),
+        timestamp: Date.now(),
+        isWinner: isWinner,
+        isDraw: isDraw,
+        mode: state.mode,
+        deltaMmr: delta,
+        durationSec: stats.durationSec,
+        accuracy: stats.accuracy
+    });
+    if (profile.history.length > 20) {
+        profile.history = profile.history.slice(0, 20);
+    }
+
+    saveStoredProfile(profile);
+    updateProfileUI();
+
+    return delta;
+}
+
 function showGameOver(isWinner, isDraw = false) {
     stopTurnTimer();
     triggerLedEffect("victory");
@@ -775,6 +1016,23 @@ function showGameOver(isWinner, isDraw = false) {
     const accuracy = totalMoves > 0 ? Math.round((state.validMovesCount / totalMoves) * 100) : 100;
     const maxCombo = state.maxComboStreak || (isWinner ? 1 : 0);
     const errors = state.errorMovesCount;
+
+    // Calcul & Enregistrement E-Sport du MMR
+    const deltaMmr = recordMatchResult(isWinner, isDraw, {
+        durationSec: durationSec,
+        accuracy: accuracy,
+        maxCombo: maxCombo,
+        errors: errors,
+        totalMoves: totalMoves,
+        validMoves: state.validMovesCount
+    });
+
+    if (dom.postGameMmrDelta) {
+        const sign = deltaMmr >= 0 ? "+" : "";
+        const icon = deltaMmr >= 0 ? "📈" : "📉";
+        dom.postGameMmrDelta.textContent = `${icon} ${sign}${deltaMmr} MMR`;
+        dom.postGameMmrDelta.className = `post-game-mmr-tag ${deltaMmr >= 0 ? "gain" : "loss"}`;
+    }
 
     // Titres & Descriptions
     if (isDraw) {
@@ -1277,6 +1535,35 @@ function initCommandCenter() {
             sendEmote(emote);
         });
     });
+
+    // 8. Profil E-Sport & Ranked MMR (Option D)
+    if (dom.btnOpenProfile) {
+        dom.btnOpenProfile.addEventListener("click", () => {
+            updateProfileUI();
+            if (dom.profileModal) dom.profileModal.classList.remove("hidden");
+            if (window.caster) caster.playSfx("click");
+        });
+    }
+    if (dom.btnCloseProfile) {
+        dom.btnCloseProfile.addEventListener("click", () => {
+            if (dom.profileModal) dom.profileModal.classList.add("hidden");
+        });
+    }
+    if (dom.ptabHistory && dom.ptabLeaderboard) {
+        dom.ptabHistory.addEventListener("click", () => {
+            dom.ptabHistory.classList.add("active");
+            dom.ptabLeaderboard.classList.remove("active");
+            if (dom.historyTabContent) dom.historyTabContent.classList.remove("hidden");
+            if (dom.leaderboardTabContent) dom.leaderboardTabContent.classList.add("hidden");
+        });
+        dom.ptabLeaderboard.addEventListener("click", () => {
+            dom.ptabLeaderboard.classList.add("active");
+            dom.ptabHistory.classList.remove("active");
+            if (dom.leaderboardTabContent) dom.leaderboardTabContent.classList.remove("hidden");
+            if (dom.historyTabContent) dom.historyTabContent.classList.add("hidden");
+            loadLeaderboard();
+        });
+    }
 }
 
 // ==========================================================================
@@ -1746,6 +2033,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 3. Initialiser le Command Center E-Sport & Guide Modal
     initCommandCenter();
+    updateProfileUI();
 
     // 4. Salutation de bienvenue du Commentateur
     setTimeout(() => {
