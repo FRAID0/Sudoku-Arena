@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Outfit:wght@300;400;600;800;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
     <!-- GSAP Animation Engine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=15.0">
+    <link rel="stylesheet" href="css/style.css?v=26.0">
 </head>
 <body>
     <!-- Canvas particules de fond -->
@@ -57,14 +57,16 @@
             <div class="caster-bubble-container" id="casterSpeechBubble">
                 <p class="caster-speech-text" id="casterSpeechText">« Bienvenue dans l'arène ! Prépare tes neurones, chaque coup compte ! »</p>
             </div>
-            <button id="btnOpenGuide" class="caster-audio-toggle" title="Guide & Règles de l'Arène" aria-label="Guide">❓</button>
-            <button id="btnToggleVoice" class="caster-audio-toggle" title="Activer / Couper la voix de synthèse">
-                <span id="voiceIcon">🔊</span>
-            </button>
-            <a href="audio-benchmark.html" class="caster-audio-toggle" style="text-decoration:none;font-size:0.9rem;" title="Banc d'Essai & Choix des Voix">🎧</a>
-            <button id="btnOpenProfile" class="player-rank-pill" title="Profil & Rang E-Sport">
-                <span id="profileRankIcon">🥇</span> <span id="profileRankTitle">Or I</span> • <span id="profileMmrText">1000 MMR</span>
-            </button>
+            <div class="caster-actions-row">
+                <button id="btnOpenGuide" class="caster-audio-toggle" title="Guide & Règles de l'Arène" aria-label="Guide">❓</button>
+                <button id="btnToggleVoice" class="caster-audio-toggle" title="Activer / Couper la voix de synthèse">
+                    <span id="voiceIcon">🔊</span>
+                </button>
+                <a href="audio-benchmark.html" class="caster-audio-toggle" style="text-decoration:none;font-size:0.9rem;" title="Banc d'Essai & Choix des Voix">🎧</a>
+                <button id="btnOpenProfile" class="player-rank-pill" title="Profil & Rang E-Sport">
+                    <span id="profileRankIcon">🥇</span> <span id="profileRankTitle">Or I</span> • <span id="profileMmrText">1000 MMR</span>
+                </button>
+            </div>
         </section>
 
         <!-- Section Lobby (Arena Command Center) -->

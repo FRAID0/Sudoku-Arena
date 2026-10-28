@@ -138,3 +138,10 @@ graph TD
   - La télémétrie LED MQTT tourne en tâche de fond découplée ; une coupure de Mosquitto ne bloque **jamais** la validation d'un coup de Sudoku.
 * **Propreté du Dépôt Git** :
   - Zéro secret dans Git (`.env.example` versionné, secrets injectés via CI).
+
+---
+
+## 6. 🚀 Prochaines Étapes & Spécifications Avancées
+Pour le détail technique complet des 6 prochains chantiers planifiés (HPA/PDB, NetworkPolicies, Terraform, ArgoCD GitOps, Alertmanager/Loki, Stress-Testing K6), consultez le cahier des charges dédié :
+👉 [**Cahier des Charges & Spécifications — Next Steps DevOps**](devops_next_steps.md).
+
