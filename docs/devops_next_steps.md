@@ -160,15 +160,73 @@ Prouver scientifiquement la capacité d'absorption de la plateforme avant un gra
 - [ ] Rapport HTML K6 généré démontrant la tenue de 500 connexions concurrentes.
 - [ ] Graphiques Grafana montrant la corrélation entre les VU K6 et les métriques métier (`sudoku_moves_total`).
 
+## 7. 🚀 Stratégies de Déploiement Avancées & Résilience (Blue/Green, Canary, Rolling Cascade & Rollback)
+
+### 🎯 Objectif
+Garantir le déploiement continu de nouvelles versions sans coupure de match (*Zero-Downtime*) et sécuriser les mises en production avec possibilité de retour arrière instantané (*Rollback*).
+
+### 📝 Spécifications Techniques
+
+#### 7.1 Déploiement Blue / Green (Bascule Instantanée)
+- **Principe** : Maintenir deux versions identiques du backend en parallèle dans le cluster :
+  - `sudoku-backend-blue` (version active actuelle, recevant 100% du trafic).
+  - `sudoku-backend-green` (nouvelle release déployée, testée isolément).
+- **Implémentation K8s / ArgoCD** :
+  - Définition d'un Service K8s actif pointant vers le label `version: blue`.
+  - Quand les smoke-tests et les sondes de santé de `green` sont 100% vertes, mise à jour du sélecteur du Service vers `version: green` en une fraction de seconde via patch K8s ou Argo Rollouts.
+  - Maintien de l'environnement `blue` pendant 15 minutes en stand-by pour rollback immédiat si anomalie.
+
+#### 7.2 Déploiement Canary (Routage Progressif par Pourcentage)
+- **Principe** : Router une fraction minime des joueurs vers la nouvelle version avant la bascule générale :
+  - 10% du trafic ➔ 25% ➔ 50% ➔ 100%.
+- **Implémentation Ingress Nginx / Argo Rollouts** :
+  - Utilisation des annotations Ingress :
+    - `nginx.ingress.kubernetes.io/canary: "true"`
+    - `nginx.ingress.kubernetes.io/canary-weight: "10"`
+  - **Analyse Automatisée des Métriques (Canary Analysis)** :
+    - Prometheus surveille le taux d'erreurs HTTP 5xx et les déconnexions WebSocket anormales sur le canary.
+    - Si le taux d'erreurs dépasse 1%, la promotion s'interrompt immédiatement.
+
+#### 7.3 Déploiement en Cascade (Rolling Update Sécurisé)
+- **Principe** : Remplacement progressif Pod par Pod dans le Deployment K8s standard :
+  - Stratégie configurée dans `backend-deployment.yaml` :
+    ```yaml
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 1        # Crée un nouveau Pod avant de détruire un ancien
+        maxUnavailable: 0  # Ne détruit jamais un Pod avant que le nouveau ne soit Ready
+    ```
+  - **Graceful Shutdown & WebSocket Draining** :
+    - Interception du signal `SIGTERM` dans FastAPI.
+    - Les parties de Sudoku en cours disposent d'un délai de grâce de 60s pour se terminer avant arrêt du conteneur.
+
+#### 7.4 Rollback Automatique (Retour Arrière Instantané)
+- **Déclencheurs de Rollback Automatisé** :
+  1. Échec des sondes `readinessProbe` pendant plus de 30 secondes consécutives.
+  2. Détection d'un pic d'erreurs applicatives (Prometheus alert `HighErrorRate > 3%`).
+  3. CrashLoopBackOff détecté lors du démarrage du nouveau conteneur.
+- **Actions de Rollback** :
+  - En GitOps (ArgoCD) : retour automatique au dernier commit Git sain (`git revert` / auto-sync).
+  - En Helm : exécution automatique de `helm rollback sudoku-arena 0`.
+  - En K8s natif : `kubectl rollout undo deployment/backend`.
+
+### ✅ Critères d'Acceptation (DoD)
+- [ ] Une mise à jour du backend s'exécute sans déconnecter les duels WebSockets en cours.
+- [ ] Injection volontaire d'un bug dans une version `green` provoquant son rejet automatique et le maintien de la version `blue` saine.
+- [ ] Commande ou pipeline de rollback validé en moins de 5 secondes.
+
 ---
 
 ## 📌 Récapitulatif d'Exécution Recommandé
 
 | Priorité | Chantier | Complexité | Valeur Portfolio / Recruteur |
 | :---: | :--- | :---: | :--- |
-| **1** | **HPA & PDB (Auto-scaling K8s)** | Faible / Rapide | ⭐️⭐️⭐️⭐️ (Indispensable K8s) |
-| **2** | **K6 Stress Testing** | Moyenne | ⭐️⭐️⭐️⭐️⭐️ (Preuve chiffrée de scalabilité) |
-| **3** | **NetworkPolicies K8s** | Faible | ⭐️⭐️⭐️⭐️ (Sécurité Cloud-Native) |
-| **4** | **Prometheus Alertmanager** | Moyenne | ⭐️⭐️⭐️⭐️ (Observabilité opérationnelle) |
-| **5** | **ArgoCD (GitOps)** | Moyenne | ⭐️⭐️⭐️⭐️⭐️ (Standard moderne des équipes DevOps) |
-| **6** | **Terraform (IaC)** | Haute | ⭐️⭐️⭐️⭐️⭐️ (Automatisation Cloud complète) |
+| **1** | **Stratégies de Déploiement (Blue/Green & Rollback)** | Moyenne | ⭐️⭐️⭐️⭐️⭐️ (Zéro-downtime & robustesse prod) |
+| **2** | **HPA & PDB (Auto-scaling K8s)** | Faible / Rapide | ⭐️⭐️⭐️⭐️ (Indispensable K8s) |
+| **3** | **K6 Stress Testing** | Moyenne | ⭐️⭐️⭐️⭐️⭐️ (Preuve chiffrée de scalabilité) |
+| **4** | **NetworkPolicies K8s (Zero-Trust)** | Faible | ⭐️⭐️⭐️⭐️ (Sécurité Cloud-Native) |
+| **5** | **Prometheus Alertmanager & Loki** | Moyenne | ⭐️⭐️⭐️⭐️ (Observabilité opérationnelle) |
+| **6** | **ArgoCD (GitOps Continu)** | Moyenne | ⭐️⭐️⭐️⭐️⭐️ (Standard moderne des équipes DevOps) |
+| **7** | **Terraform (IaC)** | Haute | ⭐️⭐️⭐️⭐️⭐️ (Automatisation Cloud complète) |
+
