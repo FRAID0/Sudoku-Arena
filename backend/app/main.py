@@ -288,6 +288,22 @@ class CreateRoomRequest(BaseModel):
     validation_mode: str = "simple"  # "simple" (règles locales) ou "strict" (solution finale unique)
     clash_rule: str = "combo_capped"  # "strict", "combo_capped" (défaut), ou "unlimited"
     lang: str = "fr"  # "fr", "en", ou "de"
+    is_public: bool = True
+    auto_start: bool = False
+
+
+class MatchmakingRequest(BaseModel):
+    player_id: str
+    player_name: str
+    mode: str = "clash"
+    difficulty: str = "medium"
+    validation_mode: str = "simple"
+    clash_rule: str = "combo_capped"
+    lang: str = "fr"
+
+
+class FallbackAiRequest(BaseModel):
+    room_code: str
 
 
 @app.get("/health")
@@ -349,7 +365,9 @@ async def create_room(req: CreateRoomRequest):
         difficulty=req.difficulty,
         validation_mode=req.validation_mode,
         clash_rule=clash_rule,
-        lang=req.lang
+        lang=req.lang,
+        is_public=req.is_public,
+        auto_start=req.auto_start
     )
     ACTIVE_ROOMS.set(len(room_manager.rooms))
 
@@ -363,8 +381,101 @@ async def create_room(req: CreateRoomRequest):
         "validation_mode": room.validation_mode,
         "clash_rule": room.clash_rule.value,
         "lang": room.lang,
+        "is_public": room.is_public,
+        "auto_start": room.auto_start,
         "initial_puzzle": room.initial_puzzle
     }
+
+
+@app.post("/api/matchmaking/find")
+async def find_or_create_match(req: MatchmakingRequest):
+    """Trouve un rival dans un salon public ouvert, ou crée un salon en attente avec auto-lancement."""
+    try:
+        mode = GameMode(req.mode)
+    except ValueError:
+        mode = GameMode.CLASH
+
+    try:
+        clash_rule = ClashRule(req.clash_rule.lower())
+    except (ValueError, AttributeError):
+        clash_rule = ClashRule.COMBO_CAPPED
+
+    # 1. Chercher un salon public en attente
+    existing_room = room_manager.find_open_room(mode=mode, player_id=req.player_id, difficulty=req.difficulty)
+    if existing_room:
+        return {
+            "status": "matched",
+            "room_code": existing_room.room_code,
+            "mode": existing_room.mode.value,
+            "difficulty": existing_room.difficulty,
+            "validation_mode": existing_room.validation_mode,
+            "clash_rule": existing_room.clash_rule.value,
+            "lang": existing_room.lang,
+            "is_host": False,
+            "auto_start": existing_room.auto_start
+        }
+
+    # 2. Aucun salon : créer un nouveau salon public avec auto-start
+    new_room = room_manager.create_room(
+        host_id=req.player_id,
+        host_name=req.player_name,
+        mode=mode,
+        difficulty=req.difficulty,
+        validation_mode=req.validation_mode,
+        clash_rule=clash_rule,
+        lang=req.lang,
+        is_public=True,
+        auto_start=True
+    )
+    ACTIVE_ROOMS.set(len(room_manager.rooms))
+    if redis_manager and redis_manager.is_connected:
+        await redis_manager.save_room(new_room)
+
+    return {
+        "status": "waiting",
+        "room_code": new_room.room_code,
+        "mode": new_room.mode.value,
+        "difficulty": new_room.difficulty,
+        "validation_mode": new_room.validation_mode,
+        "clash_rule": new_room.clash_rule.value,
+        "lang": new_room.lang,
+        "is_host": True,
+        "auto_start": True
+    }
+
+
+@app.post("/api/matchmaking/fallback-ai")
+async def fallback_ai(req: FallbackAiRequest):
+    """Convertit immédiatement un salon d'attente en Solo AI et lance le compte à rebours."""
+    code = req.room_code.upper().strip()
+    try:
+        room = room_manager.convert_to_solo_ai(code)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if redis_manager and redis_manager.is_connected:
+        await redis_manager.save_room(room)
+
+    await ws_manager.broadcast(code, {
+        "event": "AI_FALLBACK_TRIGGERED",
+        "room_code": code,
+        "mode": room.mode.value,
+        "players": [{"id": p.player_id, "name": p.name, "is_host": p.is_host} for p in room.player_list]
+    })
+    asyncio.create_task(start_game_flow(code))
+
+    return {
+        "status": "ai_started",
+        "room_code": code,
+        "mode": room.mode.value
+    }
+
+
+@app.get("/api/matchmaking/stats")
+async def matchmaking_stats():
+    """Fournit les statistiques de l'arène en temps réel."""
+    return room_manager.get_matchmaking_stats()
+
 
 
 @app.get("/api/rooms/{room_code}")
@@ -424,6 +535,10 @@ async def websocket_endpoint(websocket: WebSocket, room_code: str, player_id: st
         "role": role,
         "players": [{"id": p.player_id, "name": p.name, "is_host": p.is_host} for p in room.player_list]
     })
+
+    # Lancement automatique immédiat si salon de matchmaking 1-clic et 2 joueurs réunis
+    if getattr(room, "auto_start", False) and len(room.players) >= 2 and room.state == RoomState.WAITING:
+        asyncio.create_task(start_game_flow(code))
 
     try:
         while True:

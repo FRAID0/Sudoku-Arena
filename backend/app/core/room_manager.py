@@ -164,6 +164,10 @@ class Room:
         self.solution: Optional[Grid] = None
         self.shared_grid: Optional[Grid] = None
 
+        # Matchmaking public & auto-lancement
+        self.is_public: bool = True
+        self.auto_start: bool = False
+
     def to_dict(self) -> dict:
         return {
             "room_code": self.room_code,
@@ -185,7 +189,9 @@ class Room:
             "turn_timeout": self.turn_timeout,
             "initial_puzzle": self.initial_puzzle,
             "solution": self.solution,
-            "shared_grid": self.shared_grid
+            "shared_grid": self.shared_grid,
+            "is_public": self.is_public,
+            "auto_start": self.auto_start
         }
 
     @classmethod
@@ -241,6 +247,8 @@ class Room:
         room.initial_puzzle = data.get("initial_puzzle")
         room.solution = data.get("solution")
         room.shared_grid = data.get("shared_grid")
+        room.is_public = data.get("is_public", True)
+        room.auto_start = data.get("auto_start", False)
         return room
 
     @property
@@ -301,7 +309,7 @@ class RoomManager:
                 return code
         raise RuntimeError("Impossible de générer un code de salon unique")
 
-    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED, lang: str = "fr") -> Room:
+    def create_room(self, host_id: str, host_name: str, mode: GameMode = GameMode.CLASH, difficulty: str = "medium", validation_mode: str = "simple", clash_rule: ClashRule = ClashRule.COMBO_CAPPED, lang: str = "fr", is_public: bool = True, auto_start: bool = False) -> Room:
         code = self._generate_unique_code()
         default_names = {"fr": "Joueur 1", "en": "Player 1", "de": "Spieler 1"}
         if not host_name or not host_name.strip() or host_name.strip() in ("Joueur 1", "Player 1", "Spieler 1"):
@@ -309,6 +317,8 @@ class RoomManager:
 
         host = Player(player_id=host_id, name=host_name, is_host=True)
         room = Room(room_code=code, host=host, mode=mode, difficulty=difficulty, validation_mode=validation_mode, clash_rule=clash_rule, lang=lang)
+        room.is_public = is_public
+        room.auto_start = auto_start
 
         # Générer le puzzle
         puzzle, solution = SudokuEngine.generate_puzzle(difficulty)
@@ -586,3 +596,49 @@ class RoomManager:
             room.spectators.remove(player_id)
 
         return None
+
+    def find_open_room(self, mode: GameMode, player_id: str, difficulty: Optional[str] = None) -> Optional[Room]:
+        """Trouve un salon public en attente d'un adversaire (autre que player_id)."""
+        candidates = []
+        for room in self.rooms.values():
+            if (room.is_public and
+                room.state == RoomState.WAITING and
+                not room.is_full and
+                room.mode == mode and
+                player_id not in room.players):
+                if difficulty and room.difficulty == difficulty:
+                    return room  # Correspondance exacte de difficulté
+                candidates.append(room)
+        return candidates[0] if candidates else None
+
+    def convert_to_solo_ai(self, room_code: str) -> Room:
+        """Bascule un salon d'attente en mode Solo AI immédiat en inscrivant le bot KI FRAID."""
+        room = self.rooms.get(room_code)
+        if not room:
+            raise ValueError("Salon introuvable.")
+        if room.state != RoomState.WAITING:
+            raise ValueError("Impossible de convertir une partie déjà commencée.")
+
+        room.mode = GameMode.SOLO_AI
+        room.is_public = False
+
+        if "bot_ki_fraid" not in room.players:
+            bot_names = {"fr": "IA FRAID 🤖", "en": "AI FRAID 🤖", "de": "KI FRAID 🤖"}
+            bot_name = bot_names.get(room.lang, "IA FRAID 🤖")
+            bot_player = Player(player_id="bot_ki_fraid", name=bot_name, is_host=False)
+            bot_player.grid = copy.deepcopy(room.initial_puzzle)
+            room.players[bot_player.player_id] = bot_player
+
+        return room
+
+    def get_matchmaking_stats(self) -> Dict:
+        """Retourne des statistiques globales du matchmaking pour le lobby et l'affichage temps réel."""
+        waiting_rooms = sum(1 for r in self.rooms.values() if r.state == RoomState.WAITING and r.is_public)
+        in_game_rooms = sum(1 for r in self.rooms.values() if r.state == RoomState.IN_GAME)
+        total_players = sum(len(r.players) for r in self.rooms.values())
+        return {
+            "waiting_rooms": waiting_rooms,
+            "in_game_rooms": in_game_rooms,
+            "total_players": total_players,
+            "total_rooms": len(self.rooms)
+        }

@@ -157,7 +157,20 @@ const dom = {
     statErrors: document.getElementById("statErrors"),
     modalDebriefText: document.getElementById("modalDebriefText"),
     btnReplayDebrief: document.getElementById("btnReplayDebrief"),
-    btnShareCard: document.getElementById("btnShareCard")
+    btnShareCard: document.getElementById("btnShareCard"),
+
+    // Matchmaking 1-Clic & Radar
+    lobbyLaunchRow: document.getElementById("lobbyLaunchRow"),
+    btnQuickMatch: document.getElementById("btnQuickMatch"),
+    quickMatchBtnText: document.getElementById("quickMatchBtnText"),
+    matchmakingOverlay: document.getElementById("matchmakingOverlay"),
+    radarTimer: document.getElementById("radarTimer"),
+    radarSubtitle: document.getElementById("radarSubtitle"),
+    radarStatsText: document.getElementById("radarStatsText"),
+    radarFallbackBox: document.getElementById("radarFallbackBox"),
+    btnFallbackAi: document.getElementById("btnFallbackAi"),
+    btnContinueWait: document.getElementById("btnContinueWait"),
+    btnCancelMatchmaking: document.getElementById("btnCancelMatchmaking")
 };
 
 // Système de Toast de Notification (Non intrusif)
@@ -459,7 +472,28 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
 
         if (msg.event === "PLAYER_JOINED") {
             updatePlayersLobby(msg.players);
+            if (msg.players && msg.players.length >= 2) {
+                closeMatchmakingOverlay();
+                dom.lobbySection.classList.add("hidden");
+                dom.gameSection.classList.remove("hidden");
+                document.body.classList.add("in-game");
+                if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
+            }
+        } else if (msg.event === "AI_FALLBACK_TRIGGERED") {
+            state.mode = "solo_ai";
+            state.isAiMatch = true;
+            closeMatchmakingOverlay();
+            dom.lobbySection.classList.add("hidden");
+            dom.gameSection.classList.remove("hidden");
+            document.body.classList.add("in-game");
+            if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
+            updatePlayersLobby(msg.players);
         } else if (msg.event === "COUNTDOWN") {
+            closeMatchmakingOverlay();
+            dom.lobbySection.classList.add("hidden");
+            dom.gameSection.classList.remove("hidden");
+            document.body.classList.add("in-game");
+            if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
             dom.countdownOverlay.classList.remove("hidden");
             dom.countdownNumber.textContent = msg.count;
             playBeep(msg.count === 1 ? 660 : 440, 0.18);
@@ -967,6 +1001,17 @@ function setDiscipline(mode) {
         }
     }
 
+    // Adaptation de la rangée de lancement (Matchmaking 1-Clic masqué en Solo IA)
+    if (dom.lobbyLaunchRow) {
+        if (mode === "solo_ai") {
+            dom.lobbyLaunchRow.classList.add("solo-mode");
+            if (dom.btnQuickMatch) dom.btnQuickMatch.style.display = "none";
+        } else {
+            dom.lobbyLaunchRow.classList.remove("solo-mode");
+            if (dom.btnQuickMatch) dom.btnQuickMatch.style.display = "";
+        }
+    }
+
     // Mise à jour des libellés de difficulté
     const btnEasy = document.getElementById("segDiffEasy");
     const btnMedium = document.getElementById("segDiffMedium");
@@ -1164,8 +1209,196 @@ function initCommandCenter() {
         });
     }
 
-    // 4. Guide Modal
+    // 4. Bouton Matchmaking Rapide 1-Clic
+    if (dom.btnQuickMatch) {
+        dom.btnQuickMatch.addEventListener("click", startQuickMatchmaking);
+    }
+
+    // 5. Boutons de repli et d'annulation du Radar
+    if (dom.btnFallbackAi) {
+        dom.btnFallbackAi.addEventListener("click", triggerFallbackAi);
+    }
+    if (dom.btnContinueWait) {
+        dom.btnContinueWait.addEventListener("click", () => {
+            if (dom.radarFallbackBox) dom.radarFallbackBox.classList.add("hidden");
+        });
+    }
+    if (dom.btnCancelMatchmaking) {
+        dom.btnCancelMatchmaking.addEventListener("click", () => {
+            closeMatchmakingOverlay();
+            if (state.socket) {
+                state.socket.close();
+                state.socket = null;
+            }
+            state.roomCode = null;
+        });
+    }
+
+    // 6. Guide Modal
     initTabbedGuideModal();
+}
+
+// ==========================================================================
+// Logique Matchmaking Rapide « 1-Clic » & Radar
+// ==========================================================================
+
+let matchmakingTimerInterval = null;
+let matchmakingSeconds = 0;
+let matchmakingActive = false;
+
+function openMatchmakingOverlay() {
+    matchmakingActive = true;
+    matchmakingSeconds = 0;
+    if (dom.matchmakingOverlay) dom.matchmakingOverlay.classList.remove("hidden");
+    if (dom.radarFallbackBox) dom.radarFallbackBox.classList.add("hidden");
+    if (dom.radarTimer) dom.radarTimer.textContent = "00:00";
+    if (dom.radarSubtitle) {
+        dom.radarSubtitle.textContent = window.i18n ? i18n.t("radar_searching_desc") : "Connexion au réseau e-sport des joueurs Sudoku Arena...";
+    }
+
+    clearInterval(matchmakingTimerInterval);
+    matchmakingTimerInterval = setInterval(() => {
+        if (!matchmakingActive) return;
+        matchmakingSeconds++;
+        const mins = Math.floor(matchmakingSeconds / 60).toString().padStart(2, "0");
+        const secs = (matchmakingSeconds % 60).toString().padStart(2, "0");
+        if (dom.radarTimer) dom.radarTimer.textContent = `${mins}:${secs}`;
+
+        // Après 8 secondes sans rival : proposer le repli IA KI FRAID
+        if (matchmakingSeconds >= 8 && dom.radarFallbackBox && dom.radarFallbackBox.classList.contains("hidden")) {
+            dom.radarFallbackBox.classList.remove("hidden");
+            if (window.caster) {
+                const noRivalText = window.i18n ? i18n.t("radar_no_human") : "Aucun rival humain disponible pour l'instant !";
+                caster.displayHud(`« ${noRivalText} »`);
+                if (caster.isVoiceEnabled) {
+                    caster.speakWebSpeech(noRivalText, (window.i18n && window.i18n.currentLang) || "fr");
+                }
+            }
+        }
+    }, 1000);
+
+    fetchMatchmakingStats();
+}
+
+function closeMatchmakingOverlay() {
+    matchmakingActive = false;
+    clearInterval(matchmakingTimerInterval);
+    if (dom.matchmakingOverlay) dom.matchmakingOverlay.classList.add("hidden");
+    if (dom.radarFallbackBox) dom.radarFallbackBox.classList.add("hidden");
+}
+
+async function fetchMatchmakingStats() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/api/matchmaking/stats`);
+        if (res.ok) {
+            const data = await res.json();
+            const currentLang = (window.i18n && window.i18n.currentLang) || "fr";
+            const statsStr = currentLang === "de"
+                ? `Wartende Räume: ${data.waiting_rooms} • Aktive Spieler: ${data.total_players}`
+                : (currentLang === "en"
+                    ? `Waiting rooms: ${data.waiting_rooms} • Active players: ${data.total_players}`
+                    : `Salons en attente: ${data.waiting_rooms} • Joueurs actifs: ${data.total_players}`);
+            if (dom.radarStatsText) dom.radarStatsText.textContent = statsStr;
+        }
+    } catch (e) {
+        // En cas d'erreur réseau, conserver le texte actuel
+    }
+}
+
+async function startQuickMatchmaking() {
+    const defaultName = window.i18n ? i18n.t("default_player_name") : "Joueur 1";
+    state.playerName = (dom.playerNameInput ? dom.playerNameInput.value.trim() : "") || defaultName;
+    const currentLang = (window.i18n && window.i18n.currentLang) || "fr";
+    const selectedClashRule = document.getElementById("clashRule") ? document.getElementById("clashRule").value : "combo_capped";
+    const modeToFind = (state.mode === "solo_ai") ? "clash" : state.mode;
+
+    openMatchmakingOverlay();
+    if (window.caster) caster.playSfx("click");
+
+    try {
+        const resp = await fetch(`${API_BASE_URL}/api/matchmaking/find`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                player_id: state.playerId,
+                player_name: state.playerName,
+                mode: modeToFind,
+                difficulty: state.difficulty,
+                validation_mode: state.validationMode,
+                clash_rule: selectedClashRule,
+                lang: currentLang
+            })
+        });
+
+        if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.detail || "Erreur de matchmaking");
+        }
+
+        const data = await resp.json();
+        state.roomCode = data.room_code;
+        state.isHost = data.is_host;
+        state.mode = data.mode;
+        state.difficulty = data.difficulty;
+        state.validationMode = data.validation_mode;
+        state.isAiMatch = false;
+
+        dom.displayRoomCode.textContent = state.roomCode;
+        dom.displayModeBadge.textContent = state.mode === "clash" ? "⚡ CLASH" : "🏎️ COURSE";
+        const meTag = window.i18n ? i18n.t("player_me_tag") : "(Moi)";
+        dom.p1Name.textContent = `${state.playerName} ${meTag}`;
+
+        if (data.status === "matched") {
+            // Rival trouvé immédiatement !
+            if (dom.radarSubtitle) {
+                dom.radarSubtitle.textContent = window.i18n ? i18n.t("radar_rival_found") : "⚔️ Rival trouvé ! Lancement du duel...";
+            }
+            if (window.caster) caster.playSfx("combo");
+
+            setTimeout(() => {
+                closeMatchmakingOverlay();
+                dom.lobbySection.classList.add("hidden");
+                dom.gameSection.classList.remove("hidden");
+                document.body.classList.add("in-game");
+                if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
+                connectWebSocket(state.roomCode);
+            }, 700);
+        } else {
+            // En attente : connecter le WebSocket dans le salon public créé
+            connectWebSocket(state.roomCode);
+        }
+
+    } catch (err) {
+        closeMatchmakingOverlay();
+        showToast("Erreur de matchmaking : " + err.message, "error");
+    }
+}
+
+async function triggerFallbackAi() {
+    if (!state.roomCode) return;
+    try {
+        if (window.caster) caster.playSfx("click");
+        const resp = await fetch(`${API_BASE_URL}/api/matchmaking/fallback-ai`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ room_code: state.roomCode })
+        });
+
+        if (!resp.ok) {
+            throw new Error("Erreur de conversion en solo IA");
+        }
+
+        state.mode = "solo_ai";
+        state.isAiMatch = true;
+        closeMatchmakingOverlay();
+        dom.lobbySection.classList.add("hidden");
+        dom.gameSection.classList.remove("hidden");
+        document.body.classList.add("in-game");
+        if (dom.arenaContainer) dom.arenaContainer.classList.add("in-game");
+
+    } catch (err) {
+        showToast("Impossible de lancer le bot : " + err.message, "error");
+    }
 }
 
 // Actions rétro-compatibles

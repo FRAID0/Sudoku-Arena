@@ -166,10 +166,18 @@
                     </div>
                 </div>
 
-                <!-- Bouton d'Action Principal Unique & Imposant -->
-                <button id="btnMainLaunch" class="btn btn-primary btn-command-launch">
-                    <span id="launchBtnIcon">🚀</span> <span id="launchBtnText" data-i18n="btn_create_clash">Créer le Salon Clash 🚀</span>
-                </button>
+                <!-- Boutons d'Action Lobby (Matchmaking 1-Clic & Salon Privé) -->
+                <div class="lobby-launch-row" id="lobbyLaunchRow">
+                    <button id="btnQuickMatch" class="btn btn-matchmaking btn-command-launch" type="button">
+                        <span class="matchmaking-pulse-icon">⚔️</span>
+                        <span id="quickMatchBtnText" data-i18n="btn_quick_match">Trouver un Rival (1-Clic) ⚡</span>
+                        <span class="quick-match-badge">LIVE</span>
+                    </button>
+                    <button id="btnMainLaunch" class="btn btn-primary btn-command-launch" type="button">
+                        <span id="launchBtnIcon">🚀</span>
+                        <span id="launchBtnText" data-i18n="btn_create_clash">Créer le Salon Clash 🚀</span>
+                    </button>
+                </div>
             </div>
         </main>
 
@@ -349,13 +357,55 @@
                 </div>
             </div>
         </div>
+
+        <!-- Overlay Matchmaking Radar (Recherche 1-Clic) -->
+        <div id="matchmakingOverlay" class="modal-overlay hidden">
+            <div class="modal-content glass-card matchmaking-card">
+                <div class="radar-container">
+                    <div class="radar-circle radar-c1"></div>
+                    <div class="radar-circle radar-c2"></div>
+                    <div class="radar-circle radar-c3"></div>
+                    <div class="radar-scanner-sweep"></div>
+                    <div class="radar-center-icon">⚔️</div>
+                </div>
+
+                <h3 class="radar-title" data-i18n="radar_searching_title">Recherche d'un Rival en direct</h3>
+                <div class="radar-timer" id="radarTimer">00:00</div>
+                <p class="radar-subtitle" id="radarSubtitle" data-i18n="radar_searching_desc">Connexion au réseau e-sport des joueurs Sudoku Arena...</p>
+                
+                <div class="radar-stats-pill" id="radarStatsPill">
+                    <span class="live-dot"></span> <span id="radarStatsText" data-i18n="radar_stats_loading">Salons en cours : analyse...</span>
+                </div>
+
+                <!-- Fallback IA après 8 secondes -->
+                <div id="radarFallbackBox" class="radar-fallback-box hidden">
+                    <div class="fallback-badge">⏱️ <span data-i18n="radar_no_human">Aucun rival humain disponible</span></div>
+                    <p class="fallback-question" data-i18n="radar_fallback_prompt">Voulez-vous affronter l'IA KI FRAID immédiatement ou continuer d'attendre ?</p>
+                    <div class="fallback-buttons">
+                        <button id="btnFallbackAi" class="btn btn-warning btn-sm" type="button">
+                            <span data-i18n="btn_challenge_ai_instant">🤖 Défier KI FRAID Immédiatement</span>
+                        </button>
+                        <button id="btnContinueWait" class="btn btn-secondary btn-sm" type="button">
+                            <span data-i18n="btn_continue_waiting">⏳ Continuer d'attendre</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="radar-actions">
+                    <button id="btnCancelMatchmaking" class="btn btn-outline-danger btn-sm" type="button">
+                        <span data-i18n="btn_cancel_search">❌ Annuler la recherche</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Toast de Notification (Feedbacks rejets / alertes) -->
         <div id="toastNotification" class="toast-notification hidden"></div>
     </div>
 
-    <script src="js/i18n.js?v=15.0"></script>
-    <script src="js/commentator.js?v=15.0"></script>
-    <script src="js/app.js?v=15.0"></script>
-    <script src="js/animations.js?v=15.0"></script>
+    <script src="js/i18n.js?v=16.0"></script>
+    <script src="js/commentator.js?v=16.0"></script>
+    <script src="js/app.js?v=16.0"></script>
+    <script src="js/animations.js?v=16.0"></script>
 </body>
 </html>

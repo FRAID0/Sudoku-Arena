@@ -235,6 +235,45 @@ class TestRoomManagerClash(unittest.TestCase):
         self.assertEqual(res_err["combo_streak"], 0)
         self.assertEqual(room.current_turn_player_id, "p2")
 
+    def test_find_open_room_and_stats(self):
+        """Test de recherche de salon public pour le matchmaking 1-clic."""
+        # Aucun salon au départ
+        found = self.manager.find_open_room(GameMode.CLASH, "player_seeker", "medium")
+        self.assertIsNone(found)
+
+        # Création d'un salon public en attente
+        room = self.manager.create_room("host_1", "Alice", GameMode.CLASH, "medium", is_public=True, auto_start=True)
+        self.assertTrue(room.is_public)
+        self.assertTrue(room.auto_start)
+
+        # L'hôte lui-même ne doit pas être apparié avec son propre salon
+        self.assertIsNone(self.manager.find_open_room(GameMode.CLASH, "host_1", "medium"))
+
+        # Un autre joueur trouve le salon
+        found = self.manager.find_open_room(GameMode.CLASH, "player_seeker", "medium")
+        self.assertIsNotNone(found)
+        self.assertEqual(found.room_code, room.room_code)
+
+        # Vérification des statistiques de matchmaking
+        stats = self.manager.get_matchmaking_stats()
+        self.assertEqual(stats["waiting_rooms"], 1)
+        self.assertEqual(stats["in_game_rooms"], 0)
+        self.assertEqual(stats["total_players"], 1)
+
+    def test_convert_to_solo_ai(self):
+        """Test de bascule immédiate vers le mode Solo AI."""
+        room = self.manager.create_room("p1", "Alice", GameMode.CLASH, "hard", is_public=True)
+        code = room.room_code
+        self.assertEqual(room.mode, GameMode.CLASH)
+        self.assertEqual(len(room.players), 1)
+
+        # Bascule vers Solo AI
+        converted = self.manager.convert_to_solo_ai(code)
+        self.assertEqual(converted.mode, GameMode.SOLO_AI)
+        self.assertFalse(converted.is_public)
+        self.assertIn("bot_ki_fraid", converted.players)
+        self.assertEqual(len(converted.players), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
