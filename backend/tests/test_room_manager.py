@@ -184,20 +184,43 @@ class TestRoomManagerClash(unittest.TestCase):
         val1 = room.solution[r1][c1]
         val2 = room.solution[r2][c2]
 
-        # Coup 1 d'Alice (valide) -> Gagne le tour bonus (ne passe PAS la main)
+        # Coup 1 d'Alice (valide) -> Gagne le tour bonus (ne passe PAS la main, pas encore de combo sur le 1er coup)
         res1 = self.manager.play_move(code, "p1", r1, c1, val1)
         self.assertTrue(res1["valid"])
         self.assertFalse(res1["turn_switched"])
-        self.assertTrue(res1["is_combo"])
+        self.assertFalse(res1["is_combo"])
         self.assertEqual(res1["combo_streak"], 1)
         self.assertEqual(room.current_turn_player_id, "p1")
 
-        # Coup 2 d'Alice (valide, 2ème d'affilée) -> Limite de combo atteinte, passe la main à Bob !
+        # Coup 2 d'Alice (valide, 2ème d'affilée rapide) -> Combo x2 validé, puis passe la main à Bob !
         res2 = self.manager.play_move(code, "p1", r2, c2, val2)
         self.assertTrue(res2["valid"])
         self.assertTrue(res2["turn_switched"])
-        self.assertFalse(res2["is_combo"])
+        self.assertTrue(res2["is_combo"])
         self.assertEqual(res2["combo_streak"], 2)
+        self.assertEqual(room.current_turn_player_id, "p2")
+
+    def test_clash_quarter_time_combo_rule(self):
+        """Un coup valide pris après le premier quart du temps (ex: > 5s sur 20s) ne doit PAS donner de combo ni conserver la main."""
+        import time
+        room = self.manager.create_room("p1", "Alice", GameMode.CLASH, "medium", validation_mode="strict", clash_rule=ClashRule.COMBO_CAPPED)
+        code = room.room_code
+        self.manager.join_room(code, "p2", "Bob")
+        self.manager.start_game(code)
+
+        # Simuler un début de tour il y a 6 secondes (sur un timeout de 20s, le quart est à 5s)
+        room.turn_timeout = 20.0
+        room.turn_start_time = time.time() - 6.0
+
+        r, c = SudokuEngine.find_empty_cell(room.shared_grid)
+        val = room.solution[r][c]
+
+        res = self.manager.play_move(code, "p1", r, c, val)
+        self.assertTrue(res["valid"])
+        # Doit passer le tour car le coup est trop lent pour un combo
+        self.assertTrue(res["turn_switched"])
+        self.assertFalse(res["is_combo"])
+        self.assertEqual(res["combo_streak"], 0)
         self.assertEqual(room.current_turn_player_id, "p2")
 
     def test_clash_unlimited_variant(self):

@@ -456,31 +456,48 @@ class RoomManager:
             player.progress = room.calculate_progress(target_grid)
 
             # Gestion de l'alternance et des combos selon la variante Clash choisie :
+            # RÈGLE OFFICIELLE : Le combo ne s'active QUE si le coup est réussi dans le premier 1/4 du temps imparti
             if room.mode in (GameMode.CLASH, GameMode.SOLO_AI):
-                room.current_combo_streak += 1
-                streak_recorded = room.current_combo_streak
-                if room.clash_rule == ClashRule.STRICT:
-                    # Option A : Alternance stricte systématique (1 coup par tour)
+                quarter_time = (room.turn_timeout or 20.0) / 4.0
+                is_fast = (time_taken <= quarter_time)
+
+                if not is_fast:
+                    # Coup trop lent (> 1/4 du chrono) : pas de combo, bris de série et passage de tour
+                    room.current_combo_streak = 0
+                    streak_recorded = 0
+                    is_combo = False
                     next_player = room.switch_turn()
                     turn_switched = True
-                    is_combo = False
-                elif room.clash_rule == ClashRule.UNLIMITED:
-                    # Option B : Série illimitée (tant qu'on valide, on garde la main)
-                    next_player = room.current_turn_player_id
-                    room.turn_start_time = time.time()
-                    turn_switched = False
-                    is_combo = (streak_recorded > 1)
                 else:
-                    # Option C (Défaut : COMBO_CAPPED) : Max 2 coups consécutifs
-                    if streak_recorded < 2:
-                        next_player = room.current_turn_player_id
-                        room.turn_start_time = time.time()
-                        turn_switched = False
-                        is_combo = True
-                    else:
+                    # Coup rapide réussi dans le premier quart du temps imparti !
+                    room.current_combo_streak += 1
+                    streak_recorded = room.current_combo_streak
+
+                    if room.clash_rule == ClashRule.STRICT:
+                        # Option A : Alternance stricte systématique (1 coup par tour)
                         next_player = room.switch_turn()
                         turn_switched = True
                         is_combo = False
+                    elif room.clash_rule == ClashRule.UNLIMITED:
+                        # Option B : Série illimitée (tant qu'on valide rapidement dans le 1/4 du temps)
+                        next_player = room.current_turn_player_id
+                        room.turn_start_time = time.time()
+                        turn_switched = False
+                        is_combo = (streak_recorded >= 2)
+                    else:
+                        # Option C (Défaut : COMBO_CAPPED) : Max 2 coups consécutifs rapides
+                        if streak_recorded < 2:
+                            # 1er coup rapide : conserve la main pour tenter le combo
+                            next_player = room.current_turn_player_id
+                            room.turn_start_time = time.time()
+                            turn_switched = False
+                            is_combo = False
+                        else:
+                            # 2ème coup rapide consécutif : COMBO x2 VALIDÉ !
+                            next_player = room.switch_turn()
+                            turn_switched = True
+                            is_combo = True
+                            room.current_combo_streak = 0
             else:
                 streak_recorded = 0
                 next_player = room.current_turn_player_id

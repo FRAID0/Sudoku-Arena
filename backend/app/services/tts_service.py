@@ -31,10 +31,30 @@ class TTSService:
         self.timeout_seconds = timeout_seconds
         os.makedirs(self.cache_dir, exist_ok=True)
 
-    def _sanitize_text(self, text: str) -> str:
-        """Nettoie le texte des éventuelles balises, guillemets ou sauts de ligne."""
+    def _normalize_speech_text(self, text: str, lang: str = "fr") -> str:
+        """
+        Normalise le texte pour la synthèse vocale.
+        Évite que 'FRAID' soit épelé lettre par lettre (F-R-A-I-D) comme un acronyme.
+        Prononce 'Fraid' naturellement et gère 'l'IA Fraid' / 'AI Fraid' / 'KI Fraid'.
+        """
         clean = re.sub(r"[\*\_\#\`\"]", "", text)
         clean = re.sub(r"\s+", " ", clean).strip()
+
+        if lang == "fr":
+            clean = re.sub(r"\bKI\s+FRAID\b", "l'IA Fraid", clean, flags=re.IGNORECASE)
+            clean = re.sub(r"\bBOT\s+IA\s+FRAID\b", "le Bot IA Fraid", clean, flags=re.IGNORECASE)
+            clean = re.sub(r"\bIA\s+FRAID\b", "l'IA Fraid", clean, flags=re.IGNORECASE)
+            clean = re.sub(r"\bFRAID\b", "Fraid", clean)
+        elif lang == "en":
+            clean = re.sub(r"\bKI\s+FRAID\b", "AI Fraid", clean, flags=re.IGNORECASE)
+            clean = re.sub(r"\bFRAID\b", "Fraid", clean)
+        else:  # de
+            clean = re.sub(r"\bFRAID\b", "Fraid", clean)
+
+        def _uncap(match):
+            return match.group(0).capitalize()
+
+        clean = re.sub(r"\b[A-Z]{4,}\b", _uncap, clean)
         return clean
 
     def _compute_hash(self, text: str, voice: str, rate_pct: int) -> str:
@@ -52,8 +72,8 @@ class TTSService:
         Synthétise ou extrait du cache un fichier audio MP3 Edge-TTS.
         Retourne l'URL relative /api/commentator/audio/{filename} ou None en cas d'indisponibilité.
         """
-        clean_text = self._sanitize_text(text)
-        if not clean_text:
+        speech_text = self._normalize_speech_text(text, lang=lang)
+        if not speech_text:
             return None
 
         voice = voice_id or DEFAULT_VOICES.get(lang, DEFAULT_VOICES["fr"])
@@ -62,7 +82,7 @@ class TTSService:
         rate_diff = int(round((rate - 1.0) * 100))
         rate_str = f"+{rate_diff}%" if rate_diff >= 0 else f"{rate_diff}%"
 
-        file_hash = self._compute_hash(clean_text, voice, rate_diff)
+        file_hash = self._compute_hash(speech_text, voice, rate_diff)
         filename = f"tts_{lang}_{file_hash}.mp3"
         filepath = os.path.join(self.cache_dir, filename)
         web_url = f"/api/commentator/audio/{filename}"
@@ -74,14 +94,14 @@ class TTSService:
         # 2. Synthèse asynchrone avec Edge-TTS et timeout strict
         try:
             import edge_tts
-            communicate = edge_tts.Communicate(clean_text, voice, rate=rate_str)
+            communicate = edge_tts.Communicate(speech_text, voice, rate=rate_str)
             await asyncio.wait_for(communicate.save(filepath), timeout=self.timeout_seconds)
             
             if os.path.exists(filepath) and os.path.getsize(filepath) > 500:
                 logger.info(f"Audio TTS généré et mis en cache : {filename} ({os.path.getsize(filepath)} octets)")
                 return web_url
         except asyncio.TimeoutError:
-            logger.warning(f"Timeout lors de la synthèse Edge-TTS pour: '{clean_text[:30]}...'")
+            logger.warning(f"Timeout lors de la synthèse Edge-TTS pour: '{speech_text[:30]}...'")
         except Exception as e:
             logger.warning(f"Erreur synthèse Edge-TTS: {e}")
 

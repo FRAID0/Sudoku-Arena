@@ -223,6 +223,7 @@ const dom = {
     settingsVoiceStatus: document.getElementById("settingsVoiceStatus"),
     settingsSfxStatus: document.getElementById("settingsSfxStatus"),
     btnSettingsTestVoice: document.getElementById("btnSettingsTestVoice"),
+    btnInGameMute: document.getElementById("btnInGameMute"),
 
     // Confirmation Quitter
     quitConfirmModal: document.getElementById("quitConfirmModal"),
@@ -1460,12 +1461,39 @@ function initTabbedGuideModal() {
     }
 }
 
+// Bascule globale du commentateur vocal (avec synchronisation de l'UI & notification)
+function toggleVoiceCaster(notify = true) {
+    if (!window.caster) return false;
+    const active = caster.toggleVoice();
+    const icon = active ? "🔊" : "🔇";
+    if (dom.voiceIcon) dom.voiceIcon.textContent = icon;
+    if (dom.btnInGameMute) dom.btnInGameMute.textContent = icon;
+    const statusText = active 
+        ? (window.i18n ? i18n.t("voice_on") : "Voix activée") 
+        : (window.i18n ? i18n.t("voice_off") : "Voix coupée");
+    if (dom.btnToggleVoice) dom.btnToggleVoice.title = statusText;
+    if (dom.btnInGameMute) dom.btnInGameMute.title = `${statusText} (Touche M)`;
+    if (dom.settingsVoiceStatus) {
+        dom.settingsVoiceStatus.textContent = active ? "Activée" : "Coupée";
+        dom.settingsVoiceStatus.classList.toggle("off", !active);
+    }
+    if (dom.btnSettingsToggleVoice) {
+        dom.btnSettingsToggleVoice.textContent = active ? "🔊 Voix ON" : "🔇 Voix OFF";
+    }
+    if (notify) {
+        showToast(active ? "🔊 Commentateur vocal activé" : "🔇 Commentateur vocal coupé", "info", 1800);
+    }
+    return active;
+}
+
 // Initialisation de la modale Paramètres Audio & Langue
 function initSettingsModal() {
     function updateSettingsUI() {
         if (!window.caster) return;
         // État Voix
         const voiceActive = caster.isVoiceEnabled;
+        if (dom.voiceIcon) dom.voiceIcon.textContent = voiceActive ? "🔊" : "🔇";
+        if (dom.btnInGameMute) dom.btnInGameMute.textContent = voiceActive ? "🔊" : "🔇";
         if (dom.settingsVoiceStatus) {
             dom.settingsVoiceStatus.textContent = voiceActive ? "Activée" : "Coupée";
             dom.settingsVoiceStatus.classList.toggle("off", !voiceActive);
@@ -1530,9 +1558,7 @@ function initSettingsModal() {
     // Toggle Voix
     if (dom.btnSettingsToggleVoice) {
         dom.btnSettingsToggleVoice.addEventListener("click", () => {
-            if (!window.caster) return;
-            const active = caster.toggleVoice();
-            if (dom.voiceIcon) dom.voiceIcon.textContent = active ? "🔊" : "🔇";
+            toggleVoiceCaster(false);
             updateSettingsUI();
         });
     }
@@ -1625,12 +1651,28 @@ function initQuitConfirmModal() {
 
     if (dom.btnConfirmQuit) {
         dom.btnConfirmQuit.addEventListener("click", () => {
+            if (dom.quitConfirmModal) dom.quitConfirmModal.classList.add("hidden");
             if (state.socket) {
                 try {
                     state.socket.send(JSON.stringify({ action: "LEAVE_ROOM" }));
                 } catch (e) {}
             }
-            window.location.reload();
+            const isInGame = dom.gameSection && !dom.gameSection.classList.contains("hidden");
+            if (isInGame && typeof showGameOver === "function") {
+                showGameOver(false);
+                const curLang = (window.i18n && window.i18n.currentLang) || "fr";
+                if (dom.modalWinnerTitle) {
+                    dom.modalWinnerTitle.textContent = curLang === "en" ? "MATCH ABANDONNÉ 🚪" : (curLang === "de" ? "SPIEL ABGEBROCHEN 🚪" : "MATCH ABANDONNÉ 🚪");
+                }
+                if (dom.modalWinnerDesc) {
+                    dom.modalWinnerDesc.textContent = curLang === "en" 
+                        ? "You left the match. Here is your performance debrief before returning to the main menu:" 
+                        : (curLang === "de" ? "Du hast das Spiel verlassen. Hier ist deine Spielzusammenfassung vor der Rückkehr zum Hauptmenü:" : "Vous avez quitté le match. Voici le bilan de votre partie avant de retourner au grand menu :");
+                }
+                if (dom.postGameBadge) dom.postGameBadge.textContent = "FORFAIT";
+            } else {
+                window.location.reload();
+            }
         });
     }
 
@@ -2223,15 +2265,34 @@ document.addEventListener("DOMContentLoaded", () => {
             setDiscipline(state.mode || "clash");
         });
 
-    // 2. Initialiser le pupitre de KI FRAID Caster
-    if (dom.btnToggleVoice && window.caster) {
-        dom.btnToggleVoice.addEventListener("click", () => {
-            const active = caster.toggleVoice();
-            if (dom.voiceIcon) dom.voiceIcon.textContent = active ? "🔊" : "🔇";
-            dom.btnToggleVoice.title = active 
-                ? (window.i18n ? i18n.t("voice_on") : "Voix activée") 
-                : (window.i18n ? i18n.t("voice_off") : "Voix coupée");
-        });
+    // 2. Initialiser le pupitre et le contrôle audio de KI FRAID Caster
+    if (dom.btnToggleVoice) {
+        dom.btnToggleVoice.addEventListener("click", () => toggleVoiceCaster(true));
+    }
+    if (dom.btnInGameMute) {
+        dom.btnInGameMute.addEventListener("click", () => toggleVoiceCaster(true));
+    }
+
+    // Raccourci clavier 'M' pour couper/activer le commentateur instantanément
+    window.addEventListener("keydown", (e) => {
+        if ((e.key === "m" || e.key === "M") && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+            if (tag !== "input" && tag !== "textarea") {
+                toggleVoiceCaster(true);
+            }
+        }
+    });
+
+    // Synchronisation initiale des icônes de voix
+    if (window.caster) {
+        const initialIcon = caster.isVoiceEnabled ? "🔊" : "🔇";
+        if (dom.voiceIcon) dom.voiceIcon.textContent = initialIcon;
+        if (dom.btnInGameMute) dom.btnInGameMute.textContent = initialIcon;
+        const statusText = caster.isVoiceEnabled 
+            ? (window.i18n ? i18n.t("voice_on") : "Voix activée") 
+            : (window.i18n ? i18n.t("voice_off") : "Voix coupée");
+        if (dom.btnToggleVoice) dom.btnToggleVoice.title = statusText;
+        if (dom.btnInGameMute) dom.btnInGameMute.title = `${statusText} (Touche M)`;
     }
 
     // 3. Initialiser le Command Center E-Sport, les Paramètres et les Modales

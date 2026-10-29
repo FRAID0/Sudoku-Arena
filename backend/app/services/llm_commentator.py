@@ -112,10 +112,10 @@ FALLBACK_TEMPLATES = {
             "Coup d'envoi du face-à-face ! {p1} défie {p2} sur ce {mode}. Préparez vos méninges !"
         ],
         "intro_bot": [
-            "Bienvenue dans l'arène ! {p1} défie mon alter-ego le Bot IA FRAID ! Prépare tes méninges, l'algorithme ne fera aucun cadeau !",
-            "Face-à-face palpitant ! {p1} se mesure au Bot IA FRAID ! Concentration maximale exigée !",
-            "L'esprit humain face au silicium ! {p1} affronte le Bot IA FRAID. Prouve ta supériorité tactique !",
-            "Défi cybernétique lancé ! {p1} entre dans l'arène contre le Bot IA FRAID. Pas le droit à l'erreur !"
+            "Bienvenue dans l'arène ! {p1} défie mon alter-ego le Bot IA Fraid ! Prépare tes méninges, l'algorithme ne fera aucun cadeau !",
+            "Face-à-face palpitant ! {p1} se mesure au Bot IA Fraid ! Concentration maximale exigée !",
+            "L'esprit humain face au silicium ! {p1} affronte le Bot IA Fraid. Prouve ta supériorité tactique !",
+            "Défi cybernétique lancé ! {p1} entre dans l'arène contre le Bot IA Fraid. Pas le droit à l'erreur !"
         ],
         "intro_solo": [
             "Bienvenue dans l'arène Sudoku {p1} ! Prépare tes neurones, chaque coup compte !",
@@ -168,11 +168,11 @@ FALLBACK_TEMPLATES = {
             "Coup de chaud dans l'arène ! {actor} enclenche le mode turbo !"
         ],
         "live_bot_provocation": [
-            "Le Bot IA FRAID montre les muscles ! Ne le laisse pas s'échapper !",
-            "Accélération du Bot IA FRAID ! La riposte adverse doit être immédiate !",
-            "Le Bot IA FRAID accélère le calcul matriciel ! Il va falloir hausser le niveau de jeu !",
-            "Réaction chirurgicale du Bot IA FRAID ! La pression retombe entièrement sur le joueur !",
-            "Le Bot IA FRAID valide sans sourciller ! Montre-lui la créativité humaine !"
+            "Le Bot IA Fraid montre les muscles ! Ne le laisse pas s'échapper !",
+            "Accélération du Bot IA Fraid ! La riposte adverse doit être immédiate !",
+            "Le Bot IA Fraid accélère le calcul matriciel ! Il va falloir hausser le niveau de jeu !",
+            "Réaction chirurgicale du Bot IA Fraid ! La pression retombe entièrement sur le joueur !",
+            "Le Bot IA Fraid valide sans sourciller ! Montre-lui la créativité humaine !"
         ]
     },
     "en": {
@@ -183,10 +183,10 @@ FALLBACK_TEMPLATES = {
             "Showtime in the arena! {p1} challenges {p2} on this {mode} duel. Precision will decide the champion!"
         ],
         "intro_bot": [
-            "Welcome to the Arena! {p1} takes on my alter-ego, the Rival Bot AI FRAID! The algorithm is ready, give it your all!",
-            "Human versus machine! {p1} takes the stage against the AI FRAID Bot! Let's see what you've got!",
-            "Silicon versus synaptic instinct! {p1} faces the AI FRAID Bot. No room for hesitation!",
-            "Cybernetic showdown! {p1} steps in against the relentless AI FRAID Bot. Bring your A-game!"
+            "Welcome to the Arena! {p1} takes on my alter-ego, the Rival Bot AI Fraid! The algorithm is ready, give it your all!",
+            "Human versus machine! {p1} takes the stage against the AI Fraid Bot! Let's see what you've got!",
+            "Silicon versus synaptic instinct! {p1} faces the AI Fraid Bot. No room for hesitation!",
+            "Cybernetic showdown! {p1} steps in against the relentless AI Fraid Bot. Bring your A-game!"
         ],
         "intro_solo": [
             "Welcome to the Sudoku Arena {p1}! Sharpen your mind, every single move matters today!",
@@ -239,11 +239,11 @@ FALLBACK_TEMPLATES = {
             "High gear engaged! {actor} is dominating the grid right now!"
         ],
         "live_bot_provocation": [
-            "Rival Bot AI FRAID is flexing! Don't let the algorithm run away with this!",
-            "The AI FRAID Bot strikes again! Time to answer back with conviction!",
-            "AI FRAID Bot shifts into overdrive! Human creativity needs to answer now!",
-            "Algorithmic precision on display! The AI FRAID Bot sets the challenge high!",
-            "Swift strike from the AI FRAID Bot! The arena demands a counter-attack!"
+            "Rival Bot AI Fraid is flexing! Don't let the algorithm run away with this!",
+            "The AI Fraid Bot strikes again! Time to answer back with conviction!",
+            "AI Fraid Bot shifts into overdrive! Human creativity needs to answer now!",
+            "Algorithmic precision on display! The AI Fraid Bot sets the challenge high!",
+            "Swift strike from the AI Fraid Bot! The arena demands a counter-attack!"
         ]
     },
     "de": {
@@ -254,10 +254,10 @@ FALLBACK_TEMPLATES = {
             "Spitzenspiel in der Arena! {p1} gegen {p2}. Taktische Brillanz entscheidet das Duell!"
         ],
         "intro_bot": [
-            "Willkommen in der Arena! {p1} fordert meinen Bot-Rivalen KI FRAID heraus! Keine Geschenke vom Algorithmus, zeig dein Können!",
-            "Mensch gegen Maschine! {p1} tritt gegen den KI FRAID Bot an! Zeig, was du drauf hast!",
-            "Verstand gegen Algorithmus! {p1} stellt sich dem KI FRAID Bot. Höchste Wachsamkeit gefordert!",
-            "Kybernetisches Duell! {p1} fordert die Rechenpower des KI FRAID Bots heraus. Viel Erfolg!"
+            "Willkommen in der Arena! {p1} fordert meinen Bot-Rivalen KI Fraid heraus! Keine Geschenke vom Algorithmus, zeig dein Können!",
+            "Mensch gegen Maschine! {p1} tritt gegen den KI Fraid Bot an! Zeig, was du drauf hast!",
+            "Verstand gegen Algorithmus! {p1} stellt sich dem KI Fraid Bot. Höchste Wachsamkeit gefordert!",
+            "Kybernetisches Duell! {p1} fordert die Rechenpower des KI Fraid Bots heraus. Viel Erfolg!"
         ],
         "intro_solo": [
             "Willkommen in der Sudoku Arena {p1}! Jeder einzelne Zug zählt heute!",
@@ -310,11 +310,11 @@ FALLBACK_TEMPLATES = {
             "Volle Fahrt voraus! {actor} zündet die nächste Stufe!"
         ],
         "live_bot_provocation": [
-            "Bot-Rivale KI FRAID dreht auf! Lass den Algorithmus nicht davonziehen!",
-            "Der KI FRAID Bot legt vor! Jetzt muss die prompte Antwort kommen!",
-            "Rechenpower pur! Der KI FRAID Bot setzt ein starkes Ausrufezeichen!",
-            "Kühler Zug vom KI FRAID Bot! Jetzt ist menschliche Finesse gefragt!",
-            "Der KI FRAID Bot schlägt zu! Die Arena verlangt einen Gegenschlag!"
+            "Bot-Rivale KI Fraid dreht auf! Lass den Algorithmus nicht davonziehen!",
+            "Der KI Fraid Bot legt vor! Jetzt muss die prompte Antwort kommen!",
+            "Rechenpower pur! Der KI Fraid Bot setzt ein starkes Ausrufezeichen!",
+            "Kühler Zug vom KI Fraid Bot! Jetzt ist menschliche Finesse gefragt!",
+            "Der KI Fraid Bot schlägt zu! Die Arena verlangt einen Gegenschlag!"
         ]
     }
 }
@@ -401,26 +401,26 @@ class LLMCommentatorService:
         """Fournit les directives de personnalité et de prononciation exacte selon la langue."""
         if lang == "fr":
             return (
-                "RÔLE & IDENTITÉ : Tu es l'IA FRAID, le commentateur officiel e-sport de Sudoku Arena. "
-                "PRONONCIATION OBLIGATOIRE : En français, écris et nomme-toi TOUJOURS 'l'IA FRAID' "
-                "(ne dis JAMAIS 'KI FRAID' ni 'K-I', pour que la synthèse vocale prononce naturellement 'l'IA FRAID'). "
-                "Si l'adversaire est le bot, appelle-le 'le Bot IA FRAID'. "
+                "RÔLE & IDENTITÉ : Tu es l'IA Fraid (ou Ka-i Fraid), le commentateur officiel e-sport de Sudoku Arena. "
+                "PRONONCIATION OBLIGATOIRE : Écris TOUJOURS 'Fraid' en minuscules (surtout JAMAIS 'FRAID' en majuscules, "
+                "afin que le moteur vocal prononce le nom d'un seul mot fluide et ne l'épelle JAMAIS lettre par lettre). "
+                "Nomme-toi 'l'IA Fraid' ou 'Ka-i Fraid', et nomme le rival 'le Bot IA Fraid'. "
                 "DIRECTIVE DE VARIÉTÉ : Bannis formellement les clichés éculés (interdit : 'renverse la table', 'hold-up', 'les neurones chauffent', 'au coude à coude', 'en ébullition'). "
                 "Varie ton lexique : tempo, rigueur, audace, sang-froid, pression du chrono, précision chirurgicale."
             )
         elif lang == "en":
             return (
-                "ROLE & IDENTITY: You are AI FRAID, the official e-sports shoutcaster of Sudoku Arena. "
-                "PRONUNCIATION: In English, your name is 'AI FRAID' (pronounced 'Ey-Eye Fraid'), "
-                "and the training rival is 'the AI FRAID Bot'. "
+                "ROLE & IDENTITY: You are AI Fraid, the official e-sports shoutcaster of Sudoku Arena. "
+                "PRONUNCIATION: Write 'Fraid' in Titlecase (never all-caps 'FRAID' to avoid letter-by-letter spelling). "
+                "Your name is 'AI Fraid', and the training rival is 'the AI Fraid Bot'. "
                 "VARIETY DIRECTIVE: Strictly avoid repetitive clichés (forbidden: 'turns the tables', 'nail-biter', 'brains on fire'). "
                 "Vary your vocabulary: lightning tempo, cool nerves, clock pressure, tactical audacity, clinical precision."
             )
         else:  # de
             return (
-                "ROLLE & IDENTITÄT: Du bist KI FRAID, der offizielle E-Sport-Kommentator von Sudoku Arena. "
-                "AUSSPRACHE: Auf Deutsch heißt du 'KI FRAID' (gesprochen 'Ka-I Fraid'), "
-                "und der Trainingsgegner ist 'der KI FRAID Bot'. "
+                "ROLLE & IDENTITÄT: Du bist KI Fraid, der offizielle E-Sport-Kommentator von Sudoku Arena. "
+                "AUSSPRACHE: Schreibe 'Fraid' in Gemischt-Schreibung (niemals 'FRAID' in Großbuchstaben, damit der Name flüssig als ein Wort gesprochen wird). "
+                "Dein Name ist 'KI Fraid' (gesprochen 'Ka-I Fraid') und der Bot ist 'der KI Fraid Bot'. "
                 "VARIATIONS-RICHTLINIE: Vermeide abgedroschene Floskeln (verboten: 'dreht das Spiel komplett um', 'Gehirnzellen rauchen'). "
                 "Variiere deinen Wortschatz: Nervenstärke, Tempowechsel, Zeitdruck, taktische Finesse, chirurgische Präzision."
             )
@@ -601,7 +601,7 @@ class LLMCommentatorService:
     async def _call_gemini_intro(self, req: IntroRequest) -> Optional[str]:
         lang_names = {"fr": "français", "en": "anglais", "de": "allemand"}
         persona = self._get_persona_instruction(req.lang)
-        bot_default = "le Bot IA FRAID" if req.lang == "fr" else ("the AI FRAID Bot" if req.lang == "en" else "der KI FRAID Bot")
+        bot_default = "le Bot IA Fraid" if req.lang == "fr" else ("the AI Fraid Bot" if req.lang == "en" else "der KI Fraid Bot")
         p2_label = req.player2_name or bot_default
 
         prompt = (

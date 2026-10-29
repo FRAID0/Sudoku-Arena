@@ -133,8 +133,8 @@ class KIFraidCaster {
                     "Arène Course activée : aucun tour, vitesse maximale en grille miroir !"
                 ],
                 VS_BOT: [
-                    "Duel contre l'IA FRAID ! Montre à l'algorithme ce que l'esprit humain a dans le ventre !",
-                    "L'humain face au silicium : défie le Bot IA FRAID et prouve ta supériorité !"
+                    "Duel contre l'IA Fraid ! Montre à l'algorithme ce que l'esprit humain a dans le ventre !",
+                    "L'humain face au silicium : défie le Bot IA Fraid et prouve ta supériorité !"
                 ]
             },
             en: {
@@ -186,8 +186,8 @@ class KIFraidCaster {
                     "Race arena active: zero turns, flat-out sprint to the final cell!"
                 ],
                 VS_BOT: [
-                    "Duel against AI FRAID! Show the cybernetic bot what human intellect can do!",
-                    "Human vs AI showdown: test your speed against the AI FRAID Bot!"
+                    "Duel against AI Fraid! Show the cybernetic bot what human intellect can do!",
+                    "Human vs AI showdown: test your speed against the AI Fraid Bot!"
                 ]
             },
             de: {
@@ -239,8 +239,8 @@ class KIFraidCaster {
                     "Renn-Arena aktiv: Reiner Geschwindigkeitsrausch im Spiegelgitter!"
                 ],
                 VS_BOT: [
-                    "Duell gegen KI FRAID! Zeige dem Algorithmus, was der menschliche Verstand leisten kann!",
-                    "Mensch gegen Maschine: Fordere den KI FRAID Bot heraus!"
+                    "Duell gegen KI Fraid! Zeige dem Algorithmus, was der menschliche Verstand leisten kann!",
+                    "Mensch gegen Maschine: Fordere den KI Fraid Bot heraus!"
                 ]
             }
         };
@@ -598,15 +598,34 @@ class KIFraidCaster {
         }
     }
 
+    normalizeForSpeech(text, lang = "fr") {
+        if (!text) return "";
+        let clean = text.replace(/[\*\_\#\`\"]/g, "").replace(/\s+/g, " ").trim();
+        if (lang === "fr") {
+            clean = clean.replace(/\bKI\s+FRAID\b/gi, "l'IA Fraid");
+            clean = clean.replace(/\bBOT\s+IA\s+FRAID\b/gi, "le Bot IA Fraid");
+            clean = clean.replace(/\bIA\s+FRAID\b/gi, "l'IA Fraid");
+            clean = clean.replace(/\bFRAID\b/g, "Fraid");
+        } else if (lang === "en") {
+            clean = clean.replace(/\bKI\s+FRAID\b/gi, "AI Fraid");
+            clean = clean.replace(/\bFRAID\b/g, "Fraid");
+        } else {
+            clean = clean.replace(/\bFRAID\b/g, "Fraid");
+        }
+        clean = clean.replace(/\b[A-Z]{4,}\b/g, (w) => w.charAt(0) + w.slice(1).toLowerCase());
+        return clean;
+    }
+
     speakWebSpeech(text, lang = "fr", opts = {}, existingUtteranceId = null) {
         if (!("speechSynthesis" in window)) return;
         if (!existingUtteranceId) {
             this.stopAllVoice();
         }
         const utteranceId = existingUtteranceId || ++this.currentUtteranceId;
+        const speechText = this.normalizeForSpeech(text, lang);
 
         try {
-            const utterance = new SpeechSynthesisUtterance(text);
+            const utterance = new SpeechSynthesisUtterance(speechText);
             const langMap = { fr: "fr-FR", en: "en-US", de: "de-DE" };
             utterance.lang = langMap[lang] || "fr-FR";
             utterance.rate = opts.rate || 1.06;
