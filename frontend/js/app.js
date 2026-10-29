@@ -582,6 +582,7 @@ function connectWebSocket(roomCode, onOpenCallback = null) {
             state.lastDebriefText = "";
 
             if (window.caster) {
+                caster.resetMatchSession();
                 const opponentName = (state.players && state.players.length > 1) 
                     ? state.players.find(p => p.id !== state.playerId)?.name 
                     : (state.mode === "solo_ai" ? "Bot Rival KI FRAID" : null);

@@ -6,8 +6,9 @@ avec régulation anti-spam (cooldown) pour ne jamais lasser le joueur.
 """
 
 import time
+import random
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from app.core.room_manager import Room, GameMode
 from app.services.llm_commentator import LiveCommentRequest
 
@@ -23,6 +24,10 @@ class NarrativeEngine:
         self.consecutive_errors: Dict[str, Dict[str, int]] = {}
         self.clutch_triggered: Dict[str, bool] = {}
         self.previous_leader: Dict[str, Optional[str]] = {}
+        
+        # Mémoire anti-répétition de la manche en cours
+        self.recent_phrases: Dict[str, List[str]] = {}
+        self.recent_events: Dict[str, List[str]] = {}
 
     def reset_room(self, room_code: str):
         """Réinitialise les mémoires d'un salon au lancement d'une nouvelle manche."""
@@ -31,6 +36,26 @@ class NarrativeEngine:
         self.consecutive_errors.pop(code, None)
         self.clutch_triggered.pop(code, None)
         self.previous_leader.pop(code, None)
+        self.recent_phrases.pop(code, None)
+        self.recent_events.pop(code, None)
+
+    def record_comment(self, room_code: str, text: str, event_type: str):
+        """Enregistre une intervention prononcée pour la mémoire contextuelle anti-répétition."""
+        if not text:
+            return
+        code = room_code.upper()
+        if code not in self.recent_phrases:
+            self.recent_phrases[code] = []
+        if code not in self.recent_events:
+            self.recent_events[code] = []
+
+        self.recent_phrases[code].append(text.strip())
+        self.recent_events[code].append(event_type)
+
+        if len(self.recent_phrases[code]) > 5:
+            self.recent_phrases[code] = self.recent_phrases[code][-5:]
+        if len(self.recent_events[code]) > 5:
+            self.recent_events[code] = self.recent_events[code][-5:]
 
     def is_cooling_down(self, room_code: str) -> bool:
         """Vérifie si le commentateur doit garder le silence pour laisser respirer le jeu."""
@@ -100,6 +125,8 @@ class NarrativeEngine:
         empty_cells = self._count_empty_cells(room)
         leader_name, trailer_name, score_diff = self._get_leader_and_trailer(room)
         opponent = trailer_name if player.name == leader_name else leader_name
+        recent_history = list(self.recent_phrases.get(code, []))
+        comment_id = f"caster_{int(time.time()*1000)}_{random.randint(100, 999)}"
 
         # ====================================================================
         # DÉCLENCHEUR 1 : Le Money Time Absolu (Clutch Final)
@@ -117,7 +144,9 @@ class NarrativeEngine:
                 score_diff=score_diff,
                 empty_cells=empty_cells,
                 mode=room.mode.value if hasattr(room.mode, "value") else str(room.mode),
-                lang=lang
+                lang=lang,
+                recent_history=recent_history,
+                comment_id=comment_id
             )
 
         # ====================================================================
@@ -137,7 +166,9 @@ class NarrativeEngine:
                 score_diff=score_diff,
                 empty_cells=empty_cells,
                 mode=room.mode.value if hasattr(room.mode, "value") else str(room.mode),
-                lang=lang
+                lang=lang,
+                recent_history=recent_history,
+                comment_id=comment_id
             )
         self.previous_leader[code] = leader_name
 
@@ -157,7 +188,9 @@ class NarrativeEngine:
                 empty_cells=empty_cells,
                 combo_streak=2,
                 mode="solo_ai",
-                lang=lang
+                lang=lang,
+                recent_history=recent_history,
+                comment_id=comment_id
             )
 
         # ====================================================================
@@ -175,7 +208,9 @@ class NarrativeEngine:
                 empty_cells=empty_cells,
                 combo_streak=room.current_combo_streak or 2,
                 mode=room.mode.value if hasattr(room.mode, "value") else str(room.mode),
-                lang=lang
+                lang=lang,
+                recent_history=recent_history,
+                comment_id=comment_id
             )
 
         # ====================================================================
@@ -193,7 +228,9 @@ class NarrativeEngine:
                 score_diff=score_diff,
                 empty_cells=empty_cells,
                 mode=room.mode.value if hasattr(room.mode, "value") else str(room.mode),
-                lang=lang
+                lang=lang,
+                recent_history=recent_history,
+                comment_id=comment_id
             )
 
         return None
@@ -213,6 +250,8 @@ class NarrativeEngine:
         leader_name, trailer_name, score_diff = self._get_leader_and_trailer(room)
         empty_cells = self._count_empty_cells(room)
         opponent = trailer_name if player.name == leader_name else leader_name
+        recent_history = list(self.recent_phrases.get(code, []))
+        comment_id = f"caster_{int(time.time()*1000)}_{random.randint(100, 999)}"
 
         self.last_comment_time[code] = time.time()
         logger.info(f"[{code}] Déclencheur TIMEOUT_PRESSURE pour {player.name}")
@@ -224,7 +263,9 @@ class NarrativeEngine:
             score_diff=score_diff,
             empty_cells=empty_cells,
             mode=room.mode.value if hasattr(room.mode, "value") else str(room.mode),
-            lang=lang
+            lang=lang,
+            recent_history=recent_history,
+            comment_id=comment_id
         )
 
 
