@@ -14,9 +14,52 @@ from typing import Optional
 
 logger = logging.getLogger("sudoku_arena.tts_service")
 
-# Chemin vers le dossier de cache audio
-REPO_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-CACHE_DIR = os.path.join(REPO_DIR, "frontend", "assets", "audio", "cache")
+
+def _resolve_cache_dir() -> str:
+    """Résout de manière robuste et sécurisée un dossier de cache accessible en écriture."""
+    env_dir = os.environ.get("TTS_CACHE_DIR")
+    if env_dir:
+        try:
+            os.makedirs(env_dir, exist_ok=True)
+            return env_dir
+        except Exception:
+            pass
+
+    # 1. Tester l'environnement de développement local (Sudoku-Arena/frontend/assets/audio/cache)
+    curr = os.path.abspath(__file__)
+    for _ in range(5):
+        curr = os.path.dirname(curr)
+        candidate = os.path.join(curr, "frontend", "assets", "audio", "cache")
+        if os.path.exists(os.path.join(curr, "frontend", "assets")):
+            try:
+                os.makedirs(candidate, exist_ok=True)
+                test_path = os.path.join(candidate, ".write_test")
+                with open(test_path, "w") as f:
+                    f.write("ok")
+                os.remove(test_path)
+                return candidate
+            except Exception:
+                pass
+
+    # 2. Tester le dossier /app/audio_cache (environnement Docker standard)
+    app_cache = os.path.join("/app", "audio_cache")
+    try:
+        os.makedirs(app_cache, exist_ok=True)
+        return app_cache
+    except Exception:
+        pass
+
+    # 3. Repli garanti sur le dossier temporaire du système d'exploitation
+    import tempfile
+    tmp_cache = os.path.join(tempfile.gettempdir(), "sudoku_arena_audio_cache")
+    try:
+        os.makedirs(tmp_cache, exist_ok=True)
+        return tmp_cache
+    except Exception:
+        return tempfile.gettempdir()
+
+
+CACHE_DIR = _resolve_cache_dir()
 
 DEFAULT_VOICES = {
     "fr": "fr-FR-HenriNeural",
@@ -29,7 +72,10 @@ class TTSService:
     def __init__(self, cache_dir: str = CACHE_DIR, timeout_seconds: float = 2.5):
         self.cache_dir = cache_dir
         self.timeout_seconds = timeout_seconds
-        os.makedirs(self.cache_dir, exist_ok=True)
+        try:
+            os.makedirs(self.cache_dir, exist_ok=True)
+        except Exception as e:
+            logger.warning(f"Impossible de créer le dossier cache {self.cache_dir}: {e}")
 
     def _normalize_speech_text(self, text: str, lang: str = "fr") -> str:
         """
