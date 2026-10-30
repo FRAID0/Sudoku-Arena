@@ -3537,6 +3537,30 @@ input:focus, select:focus {
     }
 }
 
+/* Boutons de contrôle in-game (Mute & Settings) */
+.btn-game-mute,
+.btn-game-settings {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #f8fafc;
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+}
+
+.btn-game-mute:hover,
+.btn-game-settings:hover {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.2);
+    transform: scale(1.08);
+}
+
 
 
 

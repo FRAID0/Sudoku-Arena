@@ -29,3 +29,6 @@ test-results.xml
 .env
 *.env
 backend/.env
+
+# Audio Cache
+frontend/assets/audio/cache/

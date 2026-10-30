@@ -139,6 +139,7 @@ async def check_and_broadcast_commentary(room_code: str, player_id: str, move_re
     req = narrative_engine.evaluate_move(room, player_id, move_res, lang=room_lang)
     if req:
         comment = await commentator_service.generate_live_comment(req)
+        narrative_engine.record_comment(room_code, comment.text, req.event_type)
         await ws_manager.broadcast(room_code, {
             "event": "CASTER_COMMENT",
             "comment": comment.dict()
@@ -158,6 +159,7 @@ async def check_and_broadcast_timeout_commentary(room_code: str, timed_out_playe
     req = narrative_engine.evaluate_timeout(room, timed_out_player_id, lang=room_lang)
     if req:
         comment = await commentator_service.generate_live_comment(req)
+        narrative_engine.record_comment(room_code, comment.text, req.event_type)
         await ws_manager.broadcast(room_code, {
             "event": "CASTER_COMMENT",
             "comment": comment.dict()
@@ -344,6 +346,18 @@ async def commentator_debrief(req: DebriefRequest):
 async def commentator_live(req: LiveCommentRequest):
     """Génère une intervention de commentateur e-sport à chaud selon un événement dramatique."""
     return await commentator_service.generate_live_comment(req)
+
+
+@app.get("/api/commentator/audio/{filename}")
+async def get_commentator_audio(filename: str):
+    """Sert les fichiers audio MP3 générés et mis en cache par Edge-TTS."""
+    from fastapi.responses import FileResponse
+    from app.services.tts_service import CACHE_DIR
+    safe_filename = os.path.basename(filename)
+    filepath = os.path.join(CACHE_DIR, safe_filename)
+    if os.path.exists(filepath) and os.path.isfile(filepath):
+        return FileResponse(filepath, media_type="audio/mpeg")
+    raise HTTPException(status_code=404, detail="Audio file not found")
 
 
 @app.post("/api/rooms")

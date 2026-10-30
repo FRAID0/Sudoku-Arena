@@ -1,14 +1,21 @@
 """
 Module de Commentaire Intelligent — KI FRAID Caster 🎙️
-Intègre le LLM (Google Gemini) avec Fallback procédural instantané (0 ms).
+Intègre le LLM (Google Gemini) avec :
+1. Mémoire anti-répétition en cours de match.
+2. Sac de tirage sans remise (ShuffleBag) pour rotation garantie sans répétition immédiate.
+3. Filtre de similarité post-génération (Jaccard + préfixes).
+4. Synthèse vocale Edge-TTS studio à la demande mise en cache.
 Supporte nativement le Français 🇫🇷, l'Anglais 🇬🇧 et l'Allemand 🇩🇪.
 """
 
 import os
+import re
+import random
 import asyncio
 import logging
-from typing import Optional
+from typing import Optional, List, Dict
 from pydantic import BaseModel, Field
+from app.services.tts_service import tts_service
 
 logger = logging.getLogger("sudoku_arena.llm_commentator")
 
@@ -22,6 +29,7 @@ class IntroRequest(BaseModel):
     mode: str = Field(default="clash", description="Mode de jeu : clash, race ou solo_ai")
     clash_rule: str = Field(default="combo_capped", description="Variante : strict, combo_capped, unlimited")
     lang: str = Field(default="fr", description="Langue : fr, en ou de")
+    comment_id: Optional[str] = Field(default=None)
 
 class DebriefRequest(BaseModel):
     winner_name: str = Field(description="Nom du vainqueur")
@@ -33,6 +41,7 @@ class DebriefRequest(BaseModel):
     duration_seconds: int = Field(default=0, description="Durée de la partie")
     mode: str = Field(default="clash", description="Mode de jeu")
     lang: str = Field(default="fr", description="Langue : fr, en ou de")
+    comment_id: Optional[str] = Field(default=None)
 
 class LiveCommentRequest(BaseModel):
     event_type: str = Field(description="MOMENTUM_SHIFT, CLUTCH_MONEY_TIME, CHOKE_PRESSURE, HOT_STREAK, BOT_RIVAL_PROVOCATION")
@@ -44,6 +53,8 @@ class LiveCommentRequest(BaseModel):
     combo_streak: int = Field(default=1)
     mode: str = Field(default="clash")
     lang: str = Field(default="fr")
+    recent_history: List[str] = Field(default_factory=list, description="Derniers commentaires prononcés dans ce match")
+    comment_id: Optional[str] = Field(default=None)
 
 class CommentatorResponse(BaseModel):
     text: str = Field(description="Phrase générée pour KI FRAID")
@@ -53,156 +64,318 @@ class CommentatorResponse(BaseModel):
     rate: float = Field(default=1.06, description="Débit de parole recommandé (1.00 à 1.25)")
     pitch: float = Field(default=1.00, description="Hauteur de voix recommandée (0.95 à 1.10)")
     audio_fallback_key: str = Field(description="Clé du fichier audio statique de secours (ex: WELCOME, VICTORY, COMBO_X2)")
+    audio_url: Optional[str] = Field(default=None, description="URL du fichier audio Edge-TTS pré-généré ou mis en cache")
+    comment_id: Optional[str] = Field(default=None)
 
 # ============================================================================
-# Moteur de Fallback Procédural (0ms, 100% Hors-ligne garanti)
+# ShuffleBag : Tirage sans remise avec garde anti-oscillation
 # ============================================================================
 
-import random
+class ShuffleBag:
+    """
+    Sac de tirage aléatoire sans remise (Shuffle-Bag / Deck épuisable).
+    Garantit qu'aucune phrase ne se répète avant d'avoir joué l'ensemble du deck,
+    et empêche toute répétition consécutive ou oscillation A-B-A-B lors du remaniement.
+    """
+    def __init__(self, items: List[str]):
+        self.original_items = list(items)
+        self.current_deck: List[str] = []
+        self.last_drawn: Optional[str] = None
+
+    def draw(self) -> str:
+        if not self.original_items:
+            return ""
+        if len(self.original_items) == 1:
+            return self.original_items[0]
+
+        if not self.current_deck:
+            self.current_deck = list(self.original_items)
+            random.shuffle(self.current_deck)
+            # Empêche la première phrase du nouveau deck d'être identique à la dernière tirée
+            if self.current_deck[-1] == self.last_drawn and len(self.current_deck) > 1:
+                self.current_deck[0], self.current_deck[-1] = self.current_deck[-1], self.current_deck[0]
+
+        chosen = self.current_deck.pop()
+        self.last_drawn = chosen
+        return chosen
+
+# ============================================================================
+# Catalogue Multi-Variantes Étendu (FR, EN, DE)
+# ============================================================================
 
 FALLBACK_TEMPLATES = {
     "fr": {
         "intro_pvp": [
             "Bienvenue dans l'arène ! Duel au sommet entre {p1} et {p2} en mode {mode} ! Que le meilleur gagne !",
-            "L'ambiance monte d'un cran ! {p1} face à {p2} en mode {mode}, place au spectacle et à la précision !"
+            "L'ambiance monte d'un cran ! {p1} face à {p2} en mode {mode}, place au spectacle et à la précision !",
+            "Arène sous tension ! Deux styles s'affrontent aujourd'hui : {p1} contre {p2}. Que la logique triomphe !",
+            "Coup d'envoi du face-à-face ! {p1} défie {p2} sur ce {mode}. Préparez vos méninges !"
         ],
         "intro_bot": [
-            "Bienvenue dans l'arène ! {p1} défie mon alter-ego le Bot IA FRAID ! Prépare tes méninges, l'algorithme ne fera aucun cadeau !",
-            "Face-à-face palpitant ! {p1} se mesure au Bot IA FRAID ! Concentration maximale exigée !"
+            "Bienvenue dans l'arène ! {p1} défie mon alter-ego le Bot IA Fraid ! Prépare tes méninges, l'algorithme ne fera aucun cadeau !",
+            "Face-à-face palpitant ! {p1} se mesure au Bot IA Fraid ! Concentration maximale exigée !",
+            "L'esprit humain face au silicium ! {p1} affronte le Bot IA Fraid. Prouve ta supériorité tactique !",
+            "Défi cybernétique lancé ! {p1} entre dans l'arène contre le Bot IA Fraid. Pas le droit à l'erreur !"
         ],
         "intro_solo": [
             "Bienvenue dans l'arène Sudoku {p1} ! Prépare tes neurones, chaque coup compte !",
-            "C'est parti pour le défi solo {p1} ! Fais parler ta vitesse et ta rigueur logique !"
+            "C'est parti pour le défi solo {p1} ! Fais parler ta vitesse et ta rigueur logique !",
+            "Grille chargée pour {p1} ! Sang-froid et précision millimétrée au programme !",
+            "L'arène t'attend {p1} ! Lance-toi et vise le sans-faute !"
         ],
         "debrief_win": [
             "Quel duel d'anthologie ! {winner} s'impose avec brio face à {loser} avec un score magistral de {ws} points et {combos} combos !",
-            "Prestation magistrale ! {winner} prend le dessus sur {loser} en accumulant {ws} points et {combos} combos !"
+            "Prestation magistrale ! {winner} prend le dessus sur {loser} en accumulant {ws} points et {combos} combos !",
+            "Victoire sans appel ! {winner} a dicté son tempo du début à la fin pour vaincre {loser} avec {ws} points !",
+            "L'arène salue son champion ! {winner} triomphe avec {ws} points après une bataille haletante contre {loser} !"
         ],
         "debrief_draw": [
             "Égalité parfaite ! {p1} et {p2} terminent dos à dos avec {ws} points. Une revanche s'impose immédiatement !",
-            "Score vierge de tout écart ! {p1} et {p2} finissent ex-aequo à {ws} points. Match splendide !"
+            "Score vierge de tout écart ! {p1} et {p2} finissent ex-aequo à {ws} points. Match splendide !",
+            "Partage des points d'une rare intensité ! {p1} et {p2} neutralisés à {ws} points !"
         ],
         "debrief_solo": [
             "Fin de partie ! {winner} triomphe avec {ws} points au compteur. Une prestation d'une grande rigueur !",
-            "Défi relevé avec brio ! {winner} conclut sa grille avec un total de {ws} points !"
+            "Défi relevé avec brio ! {winner} conclut sa grille avec un total de {ws} points !",
+            "Grille maîtrisée de bout en bout ! {winner} affiche un score solide de {ws} points !"
         ],
         "live_momentum_shift": [
             "Incroyable bascule ! {actor} passe devant au score avec {score_diff} points d'avance !",
-            "Changement de leader ! {actor} renverse la vapeur et s'empare de la tête (+{score_diff} pts) !"
+            "Changement de leader ! {actor} prend les commandes du match (+{score_diff} pts) !",
+            "La dynamique s'inverse ! {actor} comble son retard et s'empare de la tête (+{score_diff} pts) !",
+            "Coup de théâtre sur la grille ! {actor} s'installe en pole position avec {score_diff} points d'écart !",
+            "Renversement tactique ! {actor} impose son rythme et repasse devant (+{score_diff} pts) !"
         ],
         "live_clutch_money_time": [
             "Money time absolu ! Plus que {empty_cells} cases, la moindre erreur est éliminatoire !",
-            "Tension maximale dans l'arène ! {empty_cells} cases restantes, chaque chiffre vaut de l'or !"
+            "Tension maximale dans l'arène ! {empty_cells} cases restantes, chaque chiffre vaut de l'or !",
+            "Sprint final engagé ! Seulement {empty_cells} cases à pourvoir, l'étau se resserre !",
+            "Dernière ligne droite ! Plus que {empty_cells} cases ouvertes, gardez le sang-froid !",
+            "L'arène retient son souffle ! {empty_cells} chiffres restants, interdiction formelle de trembler !"
         ],
         "live_choke_pressure": [
             "Aïe sous la pression ! {actor} commet une faute au pire moment possible !",
-            "Coup dur ! {actor} trébuche face à l'urgence du chrono, la main passe !"
+            "Coup dur ! {actor} trébuche face à l'urgence du chrono, la main passe !",
+            "Faux pas regrettable pour {actor} ! La précipitation coûte très cher dans ce duel !",
+            "Hésitation fatale ! {actor} cède son tour sur une case piégée !",
+            "La pression monte d'un cran : {actor} manque sa cible, occasion en or pour l'adversaire !"
         ],
         "live_hot_streak": [
             "Quel rythme d'enfer ! {actor} enchaîne les coups avec une vista insolente !",
-            "En pleine confiance ! {actor} aligne les validations avec une précision chirurgicale !"
+            "En pleine confiance ! {actor} aligne les validations avec une précision chirurgicale !",
+            "Démonstration de vitesse ! {actor} accélère la cadence et verrouille les chiffres !",
+            "Impressionnante fluidité ! {actor} trouve les failles de la grille sans la moindre hésitation !",
+            "Coup de chaud dans l'arène ! {actor} enclenche le mode turbo !"
         ],
         "live_bot_provocation": [
-            "Le Bot IA FRAID montre les muscles ! Ne le laisse pas s'échapper !",
-            "Accélération du Bot IA FRAID ! La riposte adverse doit être immédiate !"
+            "Le Bot IA Fraid montre les muscles ! Ne le laisse pas s'échapper !",
+            "Accélération du Bot IA Fraid ! La riposte adverse doit être immédiate !",
+            "Le Bot IA Fraid accélère le calcul matriciel ! Il va falloir hausser le niveau de jeu !",
+            "Réaction chirurgicale du Bot IA Fraid ! La pression retombe entièrement sur le joueur !",
+            "Le Bot IA Fraid valide sans sourciller ! Montre-lui la créativité humaine !"
         ]
     },
     "en": {
         "intro_pvp": [
             "Welcome to the Arena! Epic clash between {p1} and {p2} in {mode} mode! Sharpen your minds, let the battle begin!",
-            "High stakes today! {p1} versus {p2} in {mode} mode! May the sharpest logic prevail!"
+            "High stakes today! {p1} versus {p2} in {mode} mode! May the sharpest logic prevail!",
+            "Arena atmosphere is electric! Two tactical masterminds: {p1} against {p2}. Ready, set, solve!",
+            "Showtime in the arena! {p1} challenges {p2} on this {mode} duel. Precision will decide the champion!"
         ],
         "intro_bot": [
-            "Welcome to the Arena! {p1} takes on my alter-ego, the Rival Bot AI FRAID! The algorithm is ready, give it your all!",
-            "Human versus machine! {p1} takes the stage against the AI FRAID Bot! Let's see what you've got!"
+            "Welcome to the Arena! {p1} takes on my alter-ego, the Rival Bot AI Fraid! The algorithm is ready, give it your all!",
+            "Human versus machine! {p1} takes the stage against the AI Fraid Bot! Let's see what you've got!",
+            "Silicon versus synaptic instinct! {p1} faces the AI Fraid Bot. No room for hesitation!",
+            "Cybernetic showdown! {p1} steps in against the relentless AI Fraid Bot. Bring your A-game!"
         ],
         "intro_solo": [
             "Welcome to the Sudoku Arena {p1}! Sharpen your mind, every single move matters today!",
-            "Solo challenge underway for {p1}! Speed and tactical precision will decide the score!"
+            "Solo challenge underway for {p1}! Speed and tactical precision will decide the score!",
+            "Grid loaded for {p1}! Keep your focus sharp and your deduction clean!",
+            "The arena awaits you, {p1}! Take your time or race the clock—your move!"
         ],
         "debrief_win": [
             "What a legendary match! {winner} takes the crown over {loser} with an incredible score of {ws} points and {combos} combos!",
-            "Supreme performance! {winner} outplays {loser} finishing with {ws} points and {combos} combos!"
+            "Supreme performance! {winner} outplays {loser} finishing with {ws} points and {combos} combos!",
+            "Decisive victory! {winner} controlled the board tempo and defeats {loser} with {ws} points!",
+            "The arena bows to the victor! {winner} claims the match with {ws} points after an intense battle!"
         ],
         "debrief_draw": [
             "Dead heat! {p1} and {p2} finish dead even at {ws} points. An immediate rematch is in order!",
-            "Perfect stalemate! {p1} and {p2} tie at {ws} points. What a thrilling showdown!"
+            "Perfect stalemate! {p1} and {p2} tie at {ws} points. What a thrilling showdown!",
+            "Split decision at the wire! Both {p1} and {p2} locked at {ws} points!"
         ],
         "debrief_solo": [
             "Match concluded! {winner} triumphs with a solid score of {ws} points. Outstanding precision!",
-            "Puzzle complete! {winner} wraps up the arena with {ws} points on the scoreboard!"
+            "Puzzle complete! {winner} wraps up the arena with {ws} points on the scoreboard!",
+            "Masterful solo run! {winner} locks in the final digit with {ws} points!"
         ],
         "live_momentum_shift": [
             "Incredible turnaround! {actor} takes the lead with a {score_diff}-point swing!",
-            "Lead change! {actor} surges ahead by {score_diff} points!"
+            "Lead change! {actor} surges ahead by {score_diff} points!",
+            "Momentum shift in the arena! {actor} captures the high ground (+{score_diff} pts)!",
+            "Tables turned! {actor} breaks through and grabs the advantage by {score_diff} points!",
+            "Dramatic swing! {actor} claims pole position with a {score_diff}-point cushion!"
         ],
         "live_clutch_money_time": [
             "Clutch time! Only {empty_cells} cells remaining, every single digit is critical!",
-            "Crunch time in the arena! Just {empty_cells} slots open, zero room for error!"
+            "Crunch time in the arena! Just {empty_cells} slots open, zero room for error!",
+            "The endgame is here! {empty_cells} squares left, steel nerves required!",
+            "Final stretch! {empty_cells} empty cells on the board, keep your composure!",
+            "Down to the wire! Just {empty_cells} numbers remain to decide the fate of this match!"
         ],
         "live_choke_pressure": [
             "Cracking under pressure! {actor} makes a costly mistake at the worst possible time!",
-            "Painful misstep! {actor} falters under time pressure, turn surrendered!"
+            "Painful misstep! {actor} falters under time pressure, turn surrendered!",
+            "Costly slip by {actor}! Rushing the clock can be deadly in this arena!",
+            "Stumbled on the board! {actor} misses the placement, handing the initiative away!",
+            "Pressure is mounting! {actor} hits a road block—golden opportunity for the opponent!"
         ],
         "live_hot_streak": [
             "Unreal momentum! {actor} is on fire with surgical precision!",
-            "Pure flow state! {actor} locks in numbers with lightning speed!"
+            "Pure flow state! {actor} locks in numbers with lightning speed!",
+            "Sizzling cadence! {actor} reads the grid like an open book!",
+            "Blistering tempo! {actor} strings together answers without blinking!",
+            "High gear engaged! {actor} is dominating the grid right now!"
         ],
         "live_bot_provocation": [
-            "Rival Bot AI FRAID is flexing! Don't let the algorithm run away with this!",
-            "The AI FRAID Bot strikes again! Time to answer back with conviction!"
+            "Rival Bot AI Fraid is flexing! Don't let the algorithm run away with this!",
+            "The AI Fraid Bot strikes again! Time to answer back with conviction!",
+            "AI Fraid Bot shifts into overdrive! Human creativity needs to answer now!",
+            "Algorithmic precision on display! The AI Fraid Bot sets the challenge high!",
+            "Swift strike from the AI Fraid Bot! The arena demands a counter-attack!"
         ]
     },
     "de": {
         "intro_pvp": [
             "Willkommen in der Arena! Großes Duell zwischen {p1} und {p2} im {mode}-Modus! Schärft euren Verstand, möge der Beste gewinnen!",
-            "Hochspannung in der Arena! {p1} gegen {p2} im {mode}-Modus, volle Konzentration jetzt!"
+            "Hochspannung in der Arena! {p1} gegen {p2} im {mode}-Modus, volle Konzentration jetzt!",
+            "Elektrisierende Atmosphäre! Zwei Denker im Wettstreit: {p1} fordert {p2} heraus. Auf die Plätze, fertig, logisch!",
+            "Spitzenspiel in der Arena! {p1} gegen {p2}. Taktische Brillanz entscheidet das Duell!"
         ],
         "intro_bot": [
-            "Willkommen in der Arena! {p1} fordert meinen Bot-Rivalen KI FRAID heraus! Keine Geschenke vom Algorithmus, zeig dein Können!",
-            "Mensch gegen Maschine! {p1} tritt gegen den KI FRAID Bot an! Zeig, was du drauf hast!"
+            "Willkommen in der Arena! {p1} fordert meinen Bot-Rivalen KI Fraid heraus! Keine Geschenke vom Algorithmus, zeig dein Können!",
+            "Mensch gegen Maschine! {p1} tritt gegen den KI Fraid Bot an! Zeig, was du drauf hast!",
+            "Verstand gegen Algorithmus! {p1} stellt sich dem KI Fraid Bot. Höchste Wachsamkeit gefordert!",
+            "Kybernetisches Duell! {p1} fordert die Rechenpower des KI Fraid Bots heraus. Viel Erfolg!"
         ],
         "intro_solo": [
             "Willkommen in der Sudoku Arena {p1}! Jeder einzelne Zug zählt heute!",
-            "Solo-Herausforderung für {p1}! Präzision und schnelle Auffassungsgabe sind gefragt!"
+            "Solo-Herausforderung für {p1}! Präzision und schnelle Auffassungsgabe sind gefragt!",
+            "Das Gitter ist bereit {p1}! Konzentration auf Maximum, jeder Zug zählt!",
+            "Deine Bühne {p1}! Beweise deine logische Stärke im Alleingang!"
         ],
         "debrief_win": [
             "Was für ein fantastisches Match! {winner} triumphiert gegen {loser} mit stolzen {ws} Punkten und {combos} Combos!",
-            "Glanzvolle Vorstellung! {winner} bezwingt {loser} mit {ws} Punkten und {combos} Combos!"
+            "Glanzvolle Vorstellung! {winner} bezwingt {loser} mit {ws} Punkten und {combos} Combos!",
+            "Klarer Sieg! {winner} bestimmte das Tempo und gewinnt gegen {loser} mit {ws} Punkten!",
+            "Die Arena feiert ihren Sieger! {winner} holt den Triumph mit {ws} Punkten nach packendem Kampf!"
         ],
         "debrief_draw": [
             "Perfektes Unentschieden! {p1} und {p2} trennen sich gleichauf mit {ws} Punkten. Zeit für die Revanche!",
-            "Gleichstand! {p1} und {p2} teilen sich die Punkte bei {ws}. Was für ein Kampf!"
+            "Gleichstand! {p1} und {p2} teilen sich die Punkte bei {ws}. Was für ein Kampf!",
+            "Punkteteilung nach einem hochdramatischen Match zwischen {p1} und {p2}!"
         ],
         "debrief_solo": [
             "Spiel beendet! {winner} gewinnt mit {ws} Punkten auf dem Konto. Höchste Präzision!",
-            "Herausforderung gemeistert! {winner} beendet das Spiel mit {ws} Punkten!"
+            "Herausforderung gemeistert! {winner} beendet das Spiel mit {ws} Punkten!",
+            "Souveräner Solo-Durchlauf! {winner} schließt die Runde mit {ws} Punkten ab!"
         ],
         "live_momentum_shift": [
             "Unglaubliche Wende! {actor} übernimmt die Führung mit {score_diff} Punkten Vorsprung!",
-            "Führungswechsel! {actor} dreht das Spiel und liegt mit {score_diff} Punkten vorne!"
+            "Führungswechsel! {actor} dreht das Spiel und liegt mit {score_diff} Punkten vorne!",
+            "Das Blatt hat sich gewendet! {actor} greift nach der Führung (+{score_diff} Pkt)!",
+            "Taktischer Coup! {actor} zieht an der Konkurrenz vorbei (+{score_diff} Punkte)!",
+            "Neuer Spitzenreiter! {actor} verschafft sich ein Polster von {score_diff} Punkten!"
         ],
         "live_clutch_money_time": [
             "Absolute Schlussphase! Nur noch {empty_cells} Felder, jeder Fehler ist tödlich!",
-            "Hochspannung! Noch {empty_cells} offene Felder, jetzt zählt absolute Nervenstärke!"
+            "Hochspannung! Noch {empty_cells} offene Felder, jetzt zählt absolute Nervenstärke!",
+            "Das Finale naht! Nur noch {empty_cells} freie Felder auf dem Brett!",
+            "Endspurt in der Arena! Noch {empty_cells} Zahlen, kein Raum für Zögern!",
+            "Herzschlagfinale! {empty_cells} offene Positionen entscheiden dieses Duell!"
         ],
         "live_choke_pressure": [
             "Nervenschwäche! {actor} patzt im denkbar ungünstigsten Moment!",
-            "Teurer Ausrutscher! {actor} verliert die Nerven unter Zeitdruck!"
+            "Teurer Ausrutscher! {actor} verliert die Nerven unter Zeitdruck!",
+            "Schmerzhafter Fehlgriff von {actor}! Zeitdruck fordert seinen Tribut!",
+            "Fehler unter Druck! {actor} verliert den Zug an den Gegner!",
+            "Die Nerven flattern bei {actor}! Große Chance für die Gegenseite!"
         ],
         "live_hot_streak": [
             "Was für ein Lauf! {actor} versenkt die Züge mit chirurgischer Präzision!",
-            "Im Flow! {actor} setzt die Zahlen in rasender Geschwindigkeit!"
+            "Im Flow! {actor} setzt die Zahlen in rasender Geschwindigkeit!",
+            "Mächtige Serie! {actor} liest das Spielfeld mit bestechender Klarheit!",
+            "Tempovorstoß! {actor} dominiert das Gitter mit blitzschnellen Zügen!",
+            "Volle Fahrt voraus! {actor} zündet die nächste Stufe!"
         ],
         "live_bot_provocation": [
-            "Bot-Rivale KI FRAID dreht auf! Lass den Algorithmus nicht davonziehen!",
-            "Der KI FRAID Bot legt vor! Jetzt muss die prompte Antwort kommen!"
+            "Bot-Rivale KI Fraid dreht auf! Lass den Algorithmus nicht davonziehen!",
+            "Der KI Fraid Bot legt vor! Jetzt muss die prompte Antwort kommen!",
+            "Rechenpower pur! Der KI Fraid Bot setzt ein starkes Ausrufezeichen!",
+            "Kühler Zug vom KI Fraid Bot! Jetzt ist menschliche Finesse gefragt!",
+            "Der KI Fraid Bot schlägt zu! Die Arena verlangt einen Gegenschlag!"
         ]
     }
 }
 
+# Initialisation des ShuffleBags pour chaque langue et catégorie de template
+SHUFFLE_BAGS: Dict[str, Dict[str, ShuffleBag]] = {}
+for lang_key, categories in FALLBACK_TEMPLATES.items():
+    SHUFFLE_BAGS[lang_key] = {}
+    for cat_key, template_list in categories.items():
+        SHUFFLE_BAGS[lang_key][cat_key] = ShuffleBag(template_list)
+
+
+# ============================================================================
+# Fonctions d'Arbitrage Anti-Répétition & Contrôle de Similarité
+# ============================================================================
+
+def is_text_too_similar(candidate: str, recent_history: List[str], threshold: float = 0.55) -> bool:
+    """
+    Vérifie si une réplique candidate est sémantiquement trop proche
+    des commentaires récents du match (Jaccard similarity + préfixes identiques).
+    """
+    if not candidate or not recent_history:
+        return False
+
+    c_words = set(re.findall(r"\w+", candidate.lower()))
+    if not c_words:
+        return False
+
+    c_words_list = candidate.lower().split()
+    c_prefix = " ".join(c_words_list[:3]) if len(c_words_list) >= 3 else candidate.lower()
+
+    for prev in recent_history:
+        if not prev:
+            continue
+        p_words = set(re.findall(r"\w+", prev.lower()))
+        if not p_words:
+            continue
+
+        p_words_list = prev.lower().split()
+        p_prefix = " ".join(p_words_list[:3]) if len(p_words_list) >= 3 else prev.lower()
+
+        # 1. Vérification des 3 premiers mots (ex: "Bienvenue dans...", "Quel duel d'anthologie...")
+        if c_prefix and p_prefix and c_prefix == p_prefix:
+            logger.info(f"Filtre anti-répétition : Même amorce détectée ('{c_prefix}')")
+            return True
+
+        # 2. Score de similarité de Jaccard sur les tokens
+        overlap = len(c_words & p_words) / len(c_words | p_words)
+        if overlap >= threshold:
+            logger.info(f"Filtre anti-répétition : Similarité de Jaccard trop élevée ({overlap:.2f} >= {threshold})")
+            return True
+
+    return False
+
+
+# ============================================================================
+# Service Principal du Commentateur E-Sport KI FRAID
+# ============================================================================
+
 class LLMCommentatorService:
-    def __init__(self, api_key: Optional[str] = None, timeout_seconds: float = 3.5):
+    def __init__(self, api_key: Optional[str] = None, timeout_seconds: float = 3.2):
         self.api_key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         self.timeout_seconds = timeout_seconds
         self.client = None
@@ -210,7 +383,7 @@ class LLMCommentatorService:
 
     def _init_gemini_client(self):
         if not self.api_key:
-            logger.info("Aucune clé GEMINI_API_KEY détectée. Mode Fallback procédural activé.")
+            logger.info("Aucune clé GEMINI_API_KEY détectée. Mode Fallback procédural actif.")
             return
 
         try:
@@ -224,54 +397,87 @@ class LLMCommentatorService:
     def is_gemini_available(self) -> bool:
         return self.client is not None
 
+    def _get_persona_instruction(self, lang: str) -> str:
+        """Fournit les directives de personnalité et de prononciation exacte selon la langue."""
+        if lang == "fr":
+            return (
+                "RÔLE & IDENTITÉ : Tu es l'IA Fraid (ou Ka-i Fraid), le commentateur officiel e-sport de Sudoku Arena. "
+                "PRONONCIATION OBLIGATOIRE : Écris TOUJOURS 'Fraid' en minuscules (surtout JAMAIS 'FRAID' en majuscules, "
+                "afin que le moteur vocal prononce le nom d'un seul mot fluide et ne l'épelle JAMAIS lettre par lettre). "
+                "Nomme-toi 'l'IA Fraid' ou 'Ka-i Fraid', et nomme le rival 'le Bot IA Fraid'. "
+                "DIRECTIVE DE VARIÉTÉ : Bannis formellement les clichés éculés (interdit : 'renverse la table', 'hold-up', 'les neurones chauffent', 'au coude à coude', 'en ébullition'). "
+                "Varie ton lexique : tempo, rigueur, audace, sang-froid, pression du chrono, précision chirurgicale."
+            )
+        elif lang == "en":
+            return (
+                "ROLE & IDENTITY: You are AI Fraid, the official e-sports shoutcaster of Sudoku Arena. "
+                "PRONUNCIATION: Write 'Fraid' in Titlecase (never all-caps 'FRAID' to avoid letter-by-letter spelling). "
+                "Your name is 'AI Fraid', and the training rival is 'the AI Fraid Bot'. "
+                "VARIETY DIRECTIVE: Strictly avoid repetitive clichés (forbidden: 'turns the tables', 'nail-biter', 'brains on fire'). "
+                "Vary your vocabulary: lightning tempo, cool nerves, clock pressure, tactical audacity, clinical precision."
+            )
+        else:  # de
+            return (
+                "ROLLE & IDENTITÄT: Du bist KI Fraid, der offizielle E-Sport-Kommentator von Sudoku Arena. "
+                "AUSSPRACHE: Schreibe 'Fraid' in Gemischt-Schreibung (niemals 'FRAID' in Großbuchstaben, damit der Name flüssig als ein Wort gesprochen wird). "
+                "Dein Name ist 'KI Fraid' (gesprochen 'Ka-I Fraid') und der Bot ist 'der KI Fraid Bot'. "
+                "VARIATIONS-RICHTLINIE: Vermeide abgedroschene Floskeln (verboten: 'dreht das Spiel komplett um', 'Gehirnzellen rauchen'). "
+                "Variiere deinen Wortschatz: Nervenstärke, Tempowechsel, Zeitdruck, taktische Finesse, chirurgische Präzision."
+            )
+
     async def generate_intro(self, req: IntroRequest) -> CommentatorResponse:
         """
         Génère une annonce d'avant-match personnalisée avec les pseudos réels et les règles.
         """
         lang = req.lang if req.lang in FALLBACK_TEMPLATES else "fr"
+        text = None
+        source = "fallback"
 
         # 1. Tentative d'appel Gemini avec timeout strict
         if self.client:
             try:
-                text = await asyncio.wait_for(self._call_gemini_intro(req), timeout=self.timeout_seconds)
-                if text:
-                    return CommentatorResponse(
-                        text=text.strip(),
-                        lang=lang,
-                        source="gemini",
-                        mood="hype",
-                        audio_fallback_key="WELCOME"
-                    )
+                candidate = await asyncio.wait_for(self._call_gemini_intro(req), timeout=self.timeout_seconds)
+                if candidate:
+                    text = candidate.strip()
+                    source = "gemini"
             except Exception as e:
-                logger.warning(f"Délai dépassé ou erreur Gemini intro ({repr(e)}). Utilisation du Fallback.")
+                logger.warning(f"Délai dépassé ou erreur Gemini intro ({repr(e)}). Utilisation du ShuffleBag.")
 
-        # 2. Fallback procédural instantané
-        t = FALLBACK_TEMPLATES[lang]
-        p1 = req.player1_name
-        p2 = req.player2_name
+        # 2. Fallback procédural via ShuffleBag (rotation garantie sans répétition immédiate)
+        if not text:
+            bags = SHUFFLE_BAGS[lang]
+            p1 = req.player1_name
+            p2 = req.player2_name
 
-        mode_label = {
-            "clash": "Clash Tour par Tour" if lang == "fr" else ("Clash Turn-Based" if lang == "en" else "Rundenbasierter Clash"),
-            "race": "Course Speedrun" if lang == "fr" else ("Race Speedrun" if lang == "en" else "Speedrun-Rennen"),
-            "solo_ai": "Duel vs Bot Rival" if lang == "fr" else ("Duel vs Rival Bot" if lang == "en" else "Duell gegen Bot-Rivale")
-        }.get(req.mode, req.mode)
+            mode_label = {
+                "clash": "Clash Tour par Tour" if lang == "fr" else ("Clash Turn-Based" if lang == "en" else "Rundenbasierter Clash"),
+                "race": "Course Speedrun" if lang == "fr" else ("Race Speedrun" if lang == "en" else "Speedrun-Rennen"),
+                "solo_ai": "Duel vs Bot Rival" if lang == "fr" else ("Duel vs Rival Bot" if lang == "en" else "Duell gegen Bot-Rivale")
+            }.get(req.mode, req.mode)
 
-        if p2 and ("bot" in p2.lower() or "fraid" in p2.lower()):
-            tmpl = random.choice(t["intro_bot"]) if isinstance(t["intro_bot"], list) else t["intro_bot"]
-            msg = tmpl.format(p1=p1, mode=mode_label)
-        elif p2:
-            tmpl = random.choice(t["intro_pvp"]) if isinstance(t["intro_pvp"], list) else t["intro_pvp"]
-            msg = tmpl.format(p1=p1, p2=p2, mode=mode_label)
-        else:
-            tmpl = random.choice(t["intro_solo"]) if isinstance(t["intro_solo"], list) else t["intro_solo"]
-            msg = tmpl.format(p1=p1)
+            if p2 and ("bot" in p2.lower() or "fraid" in p2.lower()):
+                tmpl = bags["intro_bot"].draw()
+                text = tmpl.format(p1=p1, mode=mode_label)
+            elif p2:
+                tmpl = bags["intro_pvp"].draw()
+                text = tmpl.format(p1=p1, p2=p2, mode=mode_label)
+            else:
+                tmpl = bags["intro_solo"].draw()
+                text = tmpl.format(p1=p1)
+
+        # 3. Synthèse Edge-TTS studio mise en cache
+        audio_url = await tts_service.get_or_synthesize(text, lang=lang, rate=1.06)
 
         return CommentatorResponse(
-            text=msg,
+            text=text,
             lang=lang,
-            source="fallback",
+            source=source,
             mood="hype",
-            audio_fallback_key="WELCOME"
+            rate=1.06,
+            pitch=1.00,
+            audio_fallback_key="WELCOME",
+            audio_url=audio_url,
+            comment_id=req.comment_id
         )
 
     async def generate_debrief(self, req: DebriefRequest) -> CommentatorResponse:
@@ -279,74 +485,123 @@ class LLMCommentatorService:
         Génère une analyse post-match e-sport fondée sur les faits calculés par le serveur.
         """
         lang = req.lang if req.lang in FALLBACK_TEMPLATES else "fr"
+        text = None
+        source = "fallback"
 
         # 1. Tentative d'appel Gemini
         if self.client:
             try:
-                text = await asyncio.wait_for(self._call_gemini_debrief(req), timeout=self.timeout_seconds)
-                if text:
-                    return CommentatorResponse(
-                        text=text.strip(),
-                        lang=lang,
-                        source="gemini",
-                        mood="celebratory",
-                        audio_fallback_key="VICTORY"
-                    )
+                candidate = await asyncio.wait_for(self._call_gemini_debrief(req), timeout=self.timeout_seconds)
+                if candidate:
+                    text = candidate.strip()
+                    source = "gemini"
             except Exception as e:
-                logger.warning(f"Délai dépassé ou erreur Gemini debrief ({repr(e)}). Utilisation du Fallback.")
+                logger.warning(f"Délai dépassé ou erreur Gemini debrief ({repr(e)}). Utilisation du ShuffleBag.")
 
-        # 2. Fallback procédural
-        t = FALLBACK_TEMPLATES[lang]
-        if req.is_draw:
-            tmpl = random.choice(t["debrief_draw"]) if isinstance(t["debrief_draw"], list) else t["debrief_draw"]
-            msg = tmpl.format(p1=req.winner_name, p2=req.loser_name or "Adversaire", ws=req.winner_score)
-        elif req.loser_name:
-            tmpl = random.choice(t["debrief_win"]) if isinstance(t["debrief_win"], list) else t["debrief_win"]
-            msg = tmpl.format(winner=req.winner_name, loser=req.loser_name, ws=req.winner_score, combos=req.total_combos)
-        else:
-            tmpl = random.choice(t["debrief_solo"]) if isinstance(t["debrief_solo"], list) else t["debrief_solo"]
-            msg = tmpl.format(winner=req.winner_name, ws=req.winner_score)
+        # 2. Fallback procédural via ShuffleBag
+        if not text:
+            bags = SHUFFLE_BAGS[lang]
+            if req.is_draw:
+                tmpl = bags["debrief_draw"].draw()
+                text = tmpl.format(p1=req.winner_name, p2=req.loser_name or "Adversaire", ws=req.winner_score)
+            elif req.loser_name:
+                tmpl = bags["debrief_win"].draw()
+                text = tmpl.format(winner=req.winner_name, loser=req.loser_name, ws=req.winner_score, combos=req.total_combos)
+            else:
+                tmpl = bags["debrief_solo"].draw()
+                text = tmpl.format(winner=req.winner_name, ws=req.winner_score)
+
+        # 3. Synthèse Edge-TTS studio mise en cache
+        audio_url = await tts_service.get_or_synthesize(text, lang=lang, rate=1.06)
 
         return CommentatorResponse(
-            text=msg,
+            text=text,
             lang=lang,
-            source="fallback",
+            source=source,
             mood="celebratory",
-            audio_fallback_key="VICTORY"
+            rate=1.06,
+            pitch=1.00,
+            audio_fallback_key="VICTORY",
+            audio_url=audio_url,
+            comment_id=req.comment_id
         )
 
-    def _get_persona_instruction(self, lang: str) -> str:
-        """Fournit les directives de personnalité et de prononciation exacte selon la langue."""
-        if lang == "fr":
-            return (
-                "RÔLE & IDENTITÉ : Tu es l'IA FRAID, le commentateur officiel e-sport de Sudoku Arena. "
-                "PRONONCIATION OBLIGATOIRE : En français, écris et nomme-toi TOUJOURS 'l'IA FRAID' "
-                "(ne dis JAMAIS 'KI FRAID' ni 'K-I', pour que la synthèse vocale prononce naturellement 'l'IA FRAID'). "
-                "Si l'adversaire est le bot, appelle-le 'le Bot IA FRAID'. "
-                "DIRECTIVE DE VARIÉTÉ : Bannis formellement les clichés éculés (interdit : 'renverse la table', 'hold-up', 'les neurones chauffent', 'au coude à coude', 'en ébullition'). "
-                "Varie ton lexique : tempo, rigueur, audace, sang-froid, pression du chrono, précision chirurgicale."
+    async def generate_live_comment(self, req: LiveCommentRequest) -> CommentatorResponse:
+        """
+        Génère une intervention de commentateur e-sport en direct (Echtzeit)
+        selon les événements dramatiques détectés (Money time, Remontada, Choke, Hot Streak).
+        Garantit l'absence de répétition via mémoire d'historique + filtre de similarité.
+        """
+        lang = req.lang if req.lang in FALLBACK_TEMPLATES else "fr"
+
+        mood_profiles = {
+            "CLUTCH_MONEY_TIME": ("tense", 1.15, 1.04, "MOVE_VALID"),
+            "MOMENTUM_SHIFT": ("hype", 1.18, 1.05, "COMBO_X2"),
+            "HOT_STREAK": ("impressed", 1.12, 1.02, "COMBO_X2"),
+            "CHOKE_PRESSURE": ("shocked", 1.04, 0.98, "ERROR"),
+            "BOT_RIVAL_PROVOCATION": ("sarcastic", 1.08, 1.02, "COMBO_X2")
+        }
+        mood, rate, pitch, fallback_key = mood_profiles.get(req.event_type, ("hype", 1.06, 1.00, "COMBO_X2"))
+
+        text = None
+        source = "fallback"
+
+        # 1. Tentative d'appel Gemini avec directive anti-répétition et timeout strict (2.2s)
+        if self.client:
+            try:
+                candidate = await asyncio.wait_for(self._call_gemini_live(req, mood), timeout=2.2)
+                if candidate:
+                    clean_candidate = candidate.strip()
+                    # Validation du contrôle de similarité post-génération
+                    if is_text_too_similar(clean_candidate, req.recent_history):
+                        logger.info(f"Commentaire Gemini rejeté car trop similaire à l'historique : '{clean_candidate}'. Utilisation de la rotation.")
+                    else:
+                        text = clean_candidate
+                        source = "gemini"
+            except Exception as e:
+                logger.warning(f"Délai dépassé ou erreur Gemini live ({repr(e)}). Fallback ShuffleBag.")
+
+        # 2. Fallback procédural via ShuffleBag (rotation garantie sans répétition immédiate)
+        if not text:
+            bags = SHUFFLE_BAGS[lang]
+            template_keys = {
+                "CLUTCH_MONEY_TIME": "live_clutch_money_time",
+                "MOMENTUM_SHIFT": "live_momentum_shift",
+                "HOT_STREAK": "live_hot_streak",
+                "CHOKE_PRESSURE": "live_choke_pressure",
+                "BOT_RIVAL_PROVOCATION": "live_bot_provocation"
+            }
+            template_key = template_keys.get(req.event_type, "live_momentum_shift")
+            bag = bags.get(template_key, bags["live_momentum_shift"])
+            
+            # Tirer une phrase du deck
+            tmpl = bag.draw()
+            text = tmpl.format(
+                actor=req.actor_name,
+                score_diff=abs(round(req.score_diff, 1)),
+                empty_cells=req.empty_cells,
+                combo=req.combo_streak
             )
-        elif lang == "en":
-            return (
-                "ROLE & IDENTITY: You are AI FRAID, the official e-sports shoutcaster of Sudoku Arena. "
-                "PRONUNCIATION: In English, your name is 'AI FRAID' (pronounced 'Ey-Eye Fraid'), "
-                "and the training rival is 'the AI FRAID Bot'. "
-                "VARIETY DIRECTIVE: Strictly avoid repetitive clichés (forbidden: 'turns the tables', 'nail-biter', 'brains on fire'). "
-                "Vary your vocabulary: lightning tempo, cool nerves, clock pressure, tactical audacity, clinical precision."
-            )
-        else:  # de
-            return (
-                "ROLLE & IDENTITÄT: Du bist KI FRAID, der offizielle E-Sport-Kommentator von Sudoku Arena. "
-                "AUSSPRACHE: Auf Deutsch heißt du 'KI FRAID' (gesprochen 'Ka-I Fraid'), "
-                "und der Trainingsgegner ist 'der KI FRAID Bot'. "
-                "VARIATIONS-RICHTLINIE: Vermeide abgedroschene Floskeln (verboten: 'dreht das Spiel komplett um', 'Gehirnzellen rauchen'). "
-                "Variiere deinen Wortschatz: Nervenstärke, Tempowechsel, Zeitdruck, taktische Finesse, chirurgische Präzision."
-            )
+
+        # 3. Synthèse Edge-TTS studio mise en cache
+        audio_url = await tts_service.get_or_synthesize(text, lang=lang, rate=rate)
+
+        return CommentatorResponse(
+            text=text,
+            lang=lang,
+            source=source,
+            mood=mood,
+            rate=rate,
+            pitch=pitch,
+            audio_fallback_key=fallback_key,
+            audio_url=audio_url,
+            comment_id=req.comment_id
+        )
 
     async def _call_gemini_intro(self, req: IntroRequest) -> Optional[str]:
         lang_names = {"fr": "français", "en": "anglais", "de": "allemand"}
         persona = self._get_persona_instruction(req.lang)
-        bot_default = "le Bot IA FRAID" if req.lang == "fr" else ("the AI FRAID Bot" if req.lang == "en" else "der KI FRAID Bot")
+        bot_default = "le Bot IA Fraid" if req.lang == "fr" else ("the AI Fraid Bot" if req.lang == "en" else "der KI Fraid Bot")
         p2_label = req.player2_name or bot_default
 
         prompt = (
@@ -398,72 +653,18 @@ class LLMCommentatorService:
                 continue
         return None
 
-    async def generate_live_comment(self, req: LiveCommentRequest) -> CommentatorResponse:
-        """
-        Génère une intervention de commentateur e-sport en direct (Echtzeit)
-        selon les événements dramatiques détectés (Money time, Remontada, Choke, Hot Streak).
-        """
-        lang = req.lang if req.lang in FALLBACK_TEMPLATES else "fr"
-
-        mood_profiles = {
-            "CLUTCH_MONEY_TIME": ("tense", 1.15, 1.04, "MOVE_VALID"),
-            "MOMENTUM_SHIFT": ("hype", 1.18, 1.05, "COMBO_X2"),
-            "HOT_STREAK": ("impressed", 1.12, 1.02, "COMBO_X2"),
-            "CHOKE_PRESSURE": ("shocked", 1.04, 0.98, "ERROR"),
-            "BOT_RIVAL_PROVOCATION": ("sarcastic", 1.08, 1.02, "COMBO_X2")
-        }
-        mood, rate, pitch, fallback_key = mood_profiles.get(req.event_type, ("hype", 1.06, 1.00, "COMBO_X2"))
-
-        # 1. Tentative d'appel Gemini
-        if self.client:
-            try:
-                text = await asyncio.wait_for(self._call_gemini_live(req, mood), timeout=2.2)
-                if text:
-                    return CommentatorResponse(
-                        text=text.strip(),
-                        lang=lang,
-                        source="gemini",
-                        mood=mood,
-                        rate=rate,
-                        pitch=pitch,
-                        audio_fallback_key=fallback_key
-                    )
-            except Exception as e:
-                logger.warning(f"Délai dépassé ou erreur Gemini live ({repr(e)}). Fallback.")
-
-        # 2. Fallback procédural instantané
-        t = FALLBACK_TEMPLATES[lang]
-        template_keys = {
-            "CLUTCH_MONEY_TIME": "live_clutch_money_time",
-            "MOMENTUM_SHIFT": "live_momentum_shift",
-            "HOT_STREAK": "live_hot_streak",
-            "CHOKE_PRESSURE": "live_choke_pressure",
-            "BOT_RIVAL_PROVOCATION": "live_bot_provocation"
-        }
-        template_key = template_keys.get(req.event_type, "live_momentum_shift")
-        tmpl_raw = t.get(template_key, t["live_momentum_shift"])
-        tmpl = random.choice(tmpl_raw) if isinstance(tmpl_raw, list) else tmpl_raw
-
-        text = tmpl.format(
-            actor=req.actor_name,
-            score_diff=abs(round(req.score_diff, 1)),
-            empty_cells=req.empty_cells,
-            combo=req.combo_streak
-        )
-
-        return CommentatorResponse(
-            text=text,
-            lang=lang,
-            source="fallback",
-            mood=mood,
-            rate=rate,
-            pitch=pitch,
-            audio_fallback_key=fallback_key
-        )
-
     async def _call_gemini_live(self, req: LiveCommentRequest, mood: str) -> Optional[str]:
         lang_names = {"fr": "français", "en": "anglais", "de": "allemand"}
         persona = self._get_persona_instruction(req.lang)
+
+        history_clause = ""
+        if req.recent_history:
+            history_clause = (
+                f"\nRÉPLIQUES RÉCEMMENT PRONONCÉES DANS CE MATCH :\n" +
+                "\n".join(f"- {h}" for h in req.recent_history[-4:]) +
+                "\nDIRECTIVE ANTI-RÉPÉTITION ABSOLUE : Interdiction formelle de réutiliser la même structure de phrase, "
+                "le même verbe d'ouverture ou les mêmes métaphores que ci-dessus. Propose une formulation totalement inédite.\n"
+            )
 
         prompt = (
             f"{persona}\n\n"
@@ -473,6 +674,7 @@ class LLMCommentatorService:
             f"Données de télémétrie en temps réel : Joueur actif = '{req.actor_name}', Adversaire = '{req.opponent_name or 'Rival'}', "
             f"Écart au score = {abs(round(req.score_diff, 1))} pts, Cases restantes = {req.empty_cells}, "
             f"Combos = {req.combo_streak}.\n"
+            f"{history_clause}"
             f"Contrainte technique : Ne mets aucun guillemet, aucun tiret, aucune balise markdown. Uniquement la phrase parlée directe."
         )
 
@@ -489,6 +691,6 @@ class LLMCommentatorService:
                 continue
         return None
 
+
 # Instance singleton du service
 commentator_service = LLMCommentatorService()
-
