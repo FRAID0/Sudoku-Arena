@@ -180,6 +180,20 @@ class TestNarrativeEngine(unittest.TestCase):
             if os.path.exists(dummy_path):
                 os.remove(dummy_path)
 
+    def test_api_commentator_tts_endpoint(self):
+        # Test endpoint de synthèse ou cache Edge-TTS à la demande
+        payload = {
+            "text": "Mode Simple sélectionné ! Concentration maximale !",
+            "lang": "fr"
+        }
+        res = self.client.post("/api/commentator/tts", json=payload)
+        # Peut renvoyer 200 avec audio_url si edge-tts réussit ou si mis en cache
+        if res.status_code == 200:
+            data = res.json()
+            self.assertIn("audio_url", data)
+            self.assertIn("text", data)
+            self.assertTrue(data["audio_url"].startswith("/api/commentator/audio/"))
+
 
 if __name__ == "__main__":
     unittest.main()

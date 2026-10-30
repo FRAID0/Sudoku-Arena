@@ -1357,15 +1357,7 @@ function setDiscipline(mode) {
         if (mode === "clash") caster.comment("MODE_CLASH");
         else if (mode === "race") caster.comment("MODE_RACE");
         else if (mode === "solo_ai") {
-            const aiLines = {
-                fr: "« Prêt à me défier ? Choisis bien ton niveau, je ne ferai aucun cadeau ! »",
-                en: "« Ready to challenge me? Choose your difficulty level wisely! »",
-                de: "« Bereit gegen mich anzutreten? Wähle deine Schwierigkeit mit Bedacht! »"
-            };
-            caster.displayHud(aiLines[currentLang] || aiLines.fr);
-            if (caster.isVoiceEnabled) {
-                caster.comment("VS_BOT");
-            }
+            caster.comment("VS_BOT");
         }
     }
 }
@@ -1705,7 +1697,7 @@ function explainOption(category, val) {
 
     if (key && window.caster && typeof caster.explainSetting === "function") {
         const text = window.i18n ? i18n.t(key) : "";
-        caster.explainSetting(text);
+        caster.explainSetting(text, key);
     }
 }
 

@@ -348,6 +348,28 @@ async def commentator_live(req: LiveCommentRequest):
     return await commentator_service.generate_live_comment(req)
 
 
+class TTSRequest(BaseModel):
+    text: str
+    lang: str = "fr"
+    rate: float = 1.06
+    voice_id: Optional[str] = None
+
+
+@app.post("/api/commentator/tts")
+async def commentator_tts(req: TTSRequest):
+    """Synthétise ou extrait du cache Edge-TTS un flux audio MP3 studio à la demande."""
+    from app.services.tts_service import tts_service
+    audio_url = await tts_service.get_or_synthesize(
+        text=req.text,
+        lang=req.lang,
+        rate=req.rate,
+        voice_id=req.voice_id
+    )
+    if not audio_url:
+        raise HTTPException(status_code=500, detail="TTS synthesis unavailable")
+    return {"audio_url": audio_url, "text": req.text}
+
+
 @app.get("/api/commentator/audio/{filename}")
 async def get_commentator_audio(filename: str):
     """Sert les fichiers audio MP3 générés et mis en cache par Edge-TTS."""

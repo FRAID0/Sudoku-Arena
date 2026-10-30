@@ -575,15 +575,52 @@ class KIFraidCaster {
     }
 
     /**
-     * Vocalise et affiche une explication pédagogique d'un paramètre ou d'une option
+     * Vocalise et affiche une explication pédagogique d'un paramètre ou d'une option.
+     * Utilise en priorité absolue les fichiers studio Edge-TTS (/assets/audio/options/...)
+     * ou l'API de synthèse dynamique du backend, éliminant tout synthétiseur robotique.
      */
-    explainSetting(text) {
+    async explainSetting(text, optionKey = null) {
         if (!text) return;
         const lang = (window.i18n && window.i18n.currentLang) || "fr";
         this.displayHud(text);
-        if (this.isVoiceEnabled) {
-            this.speakWebSpeech(text, lang, { rate: 1.08 });
+        if (!this.isVoiceEnabled) return;
+
+        // 1. Priorité 1 : Fichier audio studio Edge-TTS pré-généré (/assets/audio/options/...)
+        if (optionKey) {
+            const optionAudioUrl = `/assets/audio/options/${lang}/${optionKey}.mp3`;
+            this.playAudioUrl(optionAudioUrl, text, lang, null);
+            return;
         }
+
+        // 2. Priorité 2 : Synthèse dynamique Edge-TTS via l'API backend
+        await this.speakDynamic(text, lang);
+    }
+
+    /**
+     * Synthèse vocale dynamique Edge-TTS via le backend (voix studio naturelle)
+     * Repli WebSpeech optimisé uniquement si hors-ligne
+     */
+    async speakDynamic(text, lang = "fr") {
+        if (!this.isVoiceEnabled || !text) return;
+        try {
+            const resp = await fetch("/api/commentator/tts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text, lang })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.audio_url) {
+                    this.playAudioUrl(data.audio_url, text, lang, null);
+                    return;
+                }
+            }
+        } catch (e) {
+            console.warn("TTS dynamic call failed:", e);
+        }
+
+        // Repli ultime si backend hors-ligne
+        this.speakWebSpeech(text, lang, { rate: 1.0 });
     }
 
     displayHud(text) {
@@ -628,7 +665,7 @@ class KIFraidCaster {
             const utterance = new SpeechSynthesisUtterance(speechText);
             const langMap = { fr: "fr-FR", en: "en-US", de: "de-DE" };
             utterance.lang = langMap[lang] || "fr-FR";
-            utterance.rate = opts.rate || 1.06;
+            utterance.rate = opts.rate || 1.0;
             utterance.pitch = opts.pitch || 1.0;
 
             utterance.onstart = () => {
